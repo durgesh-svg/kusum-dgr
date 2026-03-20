@@ -220,7 +220,10 @@ label{display:block;font-size:10px;color:var(--text-muted);font-weight:500;margi
   display:flex;align-items:flex-end;justify-content:center}
 .modal-content{background:#fff;border-radius:14px 14px 0 0;padding:20px;width:100%;max-width:420px;
   max-height:85vh;overflow-y:auto}
-.modal-title{font-size:14px;font-weight:700;margin-bottom:12px}
+.modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.modal-title{font-size:14px;font-weight:700;margin:0}
+.modal-close{width:30px;height:30px;border-radius:50%;border:none;background:#f1f5f9;color:#64748b;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.modal-close:hover{background:#e2e8f0;color:#1e293b}
 .modal-field{margin-bottom:10px}
 .modal-field label{font-size:11px;text-transform:none;letter-spacing:0;color:var(--gray)}
 
@@ -1712,7 +1715,7 @@ function openUserModal(userId){
 function buildUserForm(u){
   const siteOpts=sites.map(s=>`<option value="${s.site_name}"${u&&u.assigned_sites&&u.assigned_sites.includes(s.site_name)?' selected':''}>${s.site_name}</option>`).join('');
   return `
-    <div class="modal-title">${u?'Edit User':'Add User'}</div>
+    <div class="modal-header"><div class="modal-title">${u?'Edit User':'Add User'}</div><button class="modal-close" onclick="closeModal()">✕</button></div>
     <div class="modal-field"><label>Phone</label><input id="mUserPhone" value="${u?u.phone:''}" ${u?'readonly class="readonly"':''}></div>
     <div class="modal-field"><label>Name</label><input id="mUserName" value="${u?u.name:''}"></div>
     <div class="modal-field"><label>Role</label>
@@ -1814,7 +1817,7 @@ function openSiteModal(siteId){
     const modal=document.getElementById('modalOverlay');
     const content=document.getElementById('modalContent');
     content.innerHTML=`
-      <div class="modal-title">Edit Site</div>
+      <div class="modal-header"><div class="modal-title">Edit Site</div><button class="modal-close" onclick="closeModal()">✕</button></div>
       <div class="modal-field"><label>Site name</label><input id="mSiteName" value="${s.site_name}" readonly class="readonly"></div>
       <div class="modal-field"><label>DC capacity (kW)</label><input id="mSiteDC" type="number" value="${s.dc_capacity_kw||''}"></div>
       <div class="modal-field"><label>AC capacity (kW)</label><input id="mSiteAC" type="number" value="${s.ac_capacity_kw||''}"></div>
@@ -1976,7 +1979,7 @@ async function runWeatherAudit(){
 // MODAL
 // ============================================================
 function closeModal(e){
-  if(e&&e.target!==document.getElementById('modalOverlay'))return;
+  if(e&&e.target&&e.target!==document.getElementById('modalOverlay'))return;
   document.getElementById('modalOverlay').classList.add('hidden');
 }
 
