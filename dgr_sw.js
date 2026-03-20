@@ -1,6 +1,6 @@
-const CACHE_NAME = 'dgr-v2';
+const CACHE_NAME = 'dgr-v3';
 const ASSETS = [
-  '/',
+  '/dgr.html',
   '/dgr_manifest.json',
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js'
 ];

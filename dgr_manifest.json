@@ -2,7 +2,7 @@
   "name": "PM KUSUM DGR",
   "short_name": "DGR",
   "description": "Daily Generation Report for PM KUSUM Solar Sites",
-  "start_url": "/",
+  "start_url": "/dgr.html",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#f4f6f9",
