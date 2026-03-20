@@ -896,7 +896,7 @@ function buildScreen2(){
         class="${isZero?'input-err':''}" style="font-size:12px;padding:6px 8px"
         oninput="onInvGen(${i},this.value)">
       <div class="inv-str">${s}</div>
-      <div class="inv-per-str">${perStr}</div>
+      <div class="inv-per-str" id="s2perStr${i}">${perStr}</div>
     `;
   }
 
@@ -920,7 +920,7 @@ function buildScreen2(){
     </div>
     <div class="auto-calc">
       <div class="auto-calc-label">Total generation</div>
-      <div class="auto-calc-value">${total.toFixed(1)} kWh</div>
+      <div class="auto-calc-value" id="s2Total">${total.toFixed(1)} kWh</div>
     </div>
     ${zeroInvs.length>0?`<div class="error-box">INV-${zeroInvs.join(', INV-')} shows zero kWh — verify before proceeding</div>`:''}
   `;
@@ -928,7 +928,16 @@ function buildScreen2(){
 
 function onInvGen(idx,val){
   formData.inv_gen[idx]=parseFloat(val)||0;
-  buildScreen2();
+  // Update totals without rebuilding (keeps focus on input)
+  const total=formData.inv_gen.reduce((a,b)=>a+(+b||0),0);
+  formData.total_gen_kwh=total;
+  const totalEl=document.getElementById('s2Total');
+  if(totalEl)totalEl.textContent=total.toFixed(1)+' kWh';
+  // Update per-string calc for this inverter
+  const strs=formData.strings_per_inv||[];
+  const s=strs[idx]||0;
+  const perStrEl=document.getElementById('s2perStr'+idx);
+  if(perStrEl)perStrEl.textContent=s>0?(formData.inv_gen[idx]/s).toFixed(1):'—';
 }
 
 // ============================================================
