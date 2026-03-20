@@ -2047,7 +2047,7 @@ window.addEventListener('offline',()=>{
 if('serviceWorker' in navigator){
   const swCode=`
     const CACHE='dgr-v1';
-    const ASSETS=['/dgr_form.html','/dgr_manifest.json'];
+    const ASSETS=['/','/dgr_manifest.json'];
     self.addEventListener('install',e=>{
       e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)).then(()=>self.skipWaiting()));
     });
@@ -2059,7 +2059,7 @@ if('serviceWorker' in navigator){
       e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request).then(resp=>{
         if(resp.status===200){const c=resp.clone();caches.open(CACHE).then(cache=>cache.put(e.request,c));}
         return resp;
-      }).catch(()=>caches.match('/dgr_form.html'))));
+      }).catch(()=>caches.match('/'))));
     });
   `;
   const blob=new Blob([swCode],{type:'application/javascript'});
