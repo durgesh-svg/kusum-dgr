@@ -762,7 +762,7 @@ function goToScreen(n){
   const nav=document.getElementById('navBar');
   if(n>=1&&n<=9){
     nav.classList.remove('hidden');
-    document.getElementById('btnBack').classList.toggle('hidden',n===1);
+    document.getElementById('btnBack').classList.remove('hidden');
     const nextBtn=document.getElementById('btnNext');
     nextBtn.textContent=n===9?'Submit Report':'Next';
     nextBtn.disabled=false;
