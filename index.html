@@ -1,0 +1,2089 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#16a34a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>PM KUSUM DGR</title>
+<link rel="manifest" href="/dgr_manifest.json">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --green:#16a34a;--green-light:#f0fdf4;--green-border:#bbf7d0;--green-dark:#15803d;
+  --amber:#a16207;--amber-light:#fef9c3;--amber-border:#fde047;
+  --red:#b91c1c;--red-light:#fee2e2;--red-border:#fca5a5;
+  --blue:#1d4ed8;--blue-light:#dbeafe;
+  --gray:#6b7280;--gray-light:#f3f4f6;
+  --border:#e5e7eb;--text:#111827;--text-muted:#9ca3af;
+  --bg:#f4f6f9;--card-bg:#ffffff;
+  --orange:#f97316;--orange-light:#fff7ed;--orange-border:#fed7aa;
+}
+html{font-size:16px;-webkit-text-size-adjust:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  background:var(--bg);color:var(--text);min-height:100dvh;overflow-x:hidden;font-size:12px}
+.hidden{display:none!important}
+
+/* Cards */
+.card{background:var(--card-bg);border:1px solid var(--border);border-radius:10px;padding:11px 13px;margin-bottom:8px}
+.card-title{font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;font-weight:500;margin-bottom:6px}
+
+/* Inputs */
+input,select,textarea{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:7px;font-size:12px;
+  background:#f9fafb;color:var(--text);font-family:inherit;-webkit-appearance:none;outline:none}
+input:focus,select:focus,textarea:focus{border-color:var(--green);background:var(--green-light)}
+input[readonly],input.readonly{background:var(--gray-light);color:var(--gray)}
+textarea{min-height:72px;resize:vertical}
+select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath d='M2 3l3 4 3-4' stroke='%236b7280' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 10px center;padding-right:28px}
+input.input-ok,select.input-ok{border-color:var(--green);background:var(--green-light);color:var(--green-dark)}
+input.input-err{border-color:var(--red-border);background:#fff5f5}
+label{display:block;font-size:10px;color:var(--text-muted);font-weight:500;margin-bottom:3px;text-transform:uppercase;letter-spacing:.04em}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px;
+  border-radius:8px;font-size:12px;font-weight:600;border:none;cursor:pointer;
+  transition:all .15s;-webkit-tap-highlight-color:transparent;font-family:inherit}
+.btn-primary{background:var(--green);color:#fff;width:100%}
+.btn-primary:active{opacity:.85}
+.btn-primary:disabled{opacity:.45;cursor:not-allowed}
+.btn-secondary{background:var(--gray-light);color:#374151;border:1px solid var(--border);max-width:72px}
+.btn-secondary:active{opacity:.85}
+.btn-block{width:100%}
+
+/* Badges */
+.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600}
+.badge-green{background:#dcfce7;color:var(--green-dark)}
+.badge-yellow{background:var(--amber-light);color:var(--amber)}
+.badge-red{background:var(--red-light);color:var(--red)}
+.badge-blue{background:var(--blue-light);color:var(--blue)}
+.badge-gray{background:#f1f5f9;color:#64748b}
+
+/* Progress dots */
+.progress-dots{display:flex;gap:4px;margin-top:6px}
+.progress-dot{height:3px;border-radius:2px;flex:1;background:var(--border)}
+.progress-dot.done{background:#86efac}
+.progress-dot.active{background:var(--green)}
+
+/* Toggle */
+.toggle{width:40px;height:22px;background:#d1d5db;border-radius:11px;position:relative;cursor:pointer;transition:background .2s;flex-shrink:0}
+.toggle::after{content:'';position:absolute;width:16px;height:16px;background:#fff;border-radius:50%;top:3px;left:3px;
+  transition:left .2s;box-shadow:0 1px 2px rgba(0,0,0,.15)}
+.toggle.on{background:var(--green)}
+.toggle.on::after{left:21px}
+
+/* Warning box */
+.warning-box{background:var(--orange-light);border:1px solid var(--orange-border);border-left:3px solid var(--orange);
+  border-radius:0 7px 7px 0;padding:8px 10px;font-size:11px;color:#c2410c;font-weight:500;margin:6px 0}
+
+/* Error box */
+.error-box{background:var(--red-light);border:1px solid var(--red-border);border-radius:7px;
+  padding:8px 10px;font-size:11px;color:var(--red);font-weight:500;margin:6px 0}
+
+/* Auto-calc box */
+.auto-calc{background:var(--green-light);border:1px solid var(--green-border);border-radius:8px;
+  padding:9px 12px;text-align:center}
+.auto-calc-label{font-size:11px;color:var(--green);font-weight:500}
+.auto-calc-value{font-size:14px;color:var(--green-dark);font-weight:700}
+
+/* Validation icons */
+.v-icon{width:18px;height:18px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0}
+.v-icon-ok{background:#dcfce7;color:var(--green-dark)}
+.v-icon-warn{background:var(--amber-light);color:var(--amber)}
+.v-icon-err{background:var(--red-light);color:var(--red)}
+
+/* WhatsApp */
+.wa-preview{background:#e9f5e9;border-radius:8px;padding:10px 12px;font-size:10px;font-family:monospace;
+  line-height:1.7;white-space:pre-wrap;max-height:180px;overflow-y:auto;margin:6px 0}
+.btn-whatsapp{background:#25d366;color:#fff;width:100%;padding:12px;border-radius:10px;
+  font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px;justify-content:center;
+  border:none;cursor:pointer;font-family:inherit}
+.btn-whatsapp:active{opacity:.85}
+
+/* Header */
+.header-bar{background:#fff;padding:10px 14px;border-bottom:1px solid #f0f0f0;position:sticky;top:0;z-index:50}
+.header-title{font-size:13px;font-weight:700;color:var(--text)}
+.header-sub{font-size:10px;color:var(--gray)}
+
+/* Nav bar */
+.nav-bar{background:#fff;border-top:1px solid #f0f0f0;padding:9px 14px 13px;display:flex;gap:7px;
+  position:sticky;bottom:0;z-index:50}
+
+/* Bottom tab bar */
+.bottom-tabs{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid #f0f0f0;
+  display:flex;z-index:100;padding:6px 0 env(safe-area-inset-bottom,6px)}
+.bottom-tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 0;
+  font-size:9px;font-weight:500;color:var(--gray);cursor:pointer;-webkit-tap-highlight-color:transparent}
+.bottom-tab.active{color:var(--green)}
+.bottom-tab svg{width:20px;height:20px}
+
+/* Screen area */
+.screen{background:var(--bg);padding:12px 14px;min-height:calc(100dvh - 100px);display:flex;flex-direction:column;gap:8px}
+.screen-padded{padding-bottom:70px}
+
+/* Level bars */
+.level-bar{height:6px;background:var(--border);border-radius:3px;overflow:hidden;margin-top:4px}
+.level-bar.oil{height:10px}
+.level-fill{height:100%;border-radius:3px;transition:width .3s}
+.level-fill.green{background:var(--green)}
+.level-fill.amber{background:#eab308}
+.level-fill.red{background:#ef4444}
+
+/* Photo slots */
+.photo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.photo-slot{height:78px;border-radius:7px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  cursor:pointer;font-size:9px;gap:2px}
+.photo-slot.empty{background:var(--gray-light);border:1.5px dashed #d1d5db;color:var(--text-muted)}
+.photo-slot.filled{background:var(--green-light);border:1.5px solid var(--green);color:var(--green-dark);font-weight:600}
+
+/* Inverter grid */
+.inv-grid{display:grid;grid-template-columns:36px 1fr 44px 52px;align-items:center;gap:4px 6px}
+.inv-header{font-size:9px;color:var(--gray);text-transform:uppercase;font-weight:700;padding-bottom:4px;border-bottom:1.5px solid var(--border)}
+.inv-row{padding:5px 0;border-bottom:1px solid var(--gray-light);display:contents}
+.inv-num{font-size:12px;font-weight:700;color:var(--blue)}
+.inv-num.err{color:var(--red)}
+.inv-str{font-size:11px;color:var(--gray);text-align:right}
+.inv-per-str{font-size:11px;color:var(--green-dark);text-align:right;font-weight:600}
+
+/* Cleaning status pills */
+.status-pill{display:inline-flex;padding:4px 10px;border-radius:6px;font-size:10px;font-weight:600;cursor:pointer;
+  border:1px solid;transition:all .15s}
+.status-pill.not-started{background:var(--gray-light);border-color:var(--text-muted);color:#4b5563}
+.status-pill.in-progress{background:var(--amber-light);border-color:#eab308;color:var(--amber)}
+.status-pill.partial{background:var(--orange-light);border-color:var(--orange);color:#c2410c}
+.status-pill.complete{background:#dcfce7;border-color:var(--green);color:var(--green-dark)}
+.status-pill.selected{box-shadow:0 0 0 2px rgba(22,163,74,.3)}
+
+/* Cleaning cycle block */
+.cycle-block{border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:6px}
+.cycle-block.locked{opacity:.55;pointer-events:none}
+
+/* Weather pills */
+.weather-pills{display:flex;flex-wrap:wrap;gap:6px}
+.weather-pill{padding:6px 12px;border-radius:16px;font-size:11px;font-weight:500;cursor:pointer;
+  border:1px solid var(--border);background:#fff;transition:all .15s}
+.weather-pill.selected{background:var(--amber-light);border-color:#eab308;color:var(--amber)}
+
+/* Review summary */
+.summary-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--gray-light)}
+.summary-label{font-size:11px;color:var(--text-muted)}
+.summary-value{font-size:11px;color:var(--text);font-weight:500;text-align:right}
+
+/* Validation row */
+.val-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--gray-light)}
+.val-text{font-size:11px;color:#374151;flex:1}
+
+/* Offline banner */
+.offline-banner{background:var(--amber-light);border:1px solid var(--amber-border);padding:6px 14px;
+  font-size:11px;color:var(--amber);font-weight:500;text-align:center;display:none}
+.offline-banner.show{display:block}
+
+/* Login screen */
+.login-screen{min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:24px;background:var(--bg)}
+.login-card{background:#fff;border-radius:12px;padding:24px;width:100%;max-width:340px;
+  border:1px solid var(--border)}
+.login-title{font-size:16px;font-weight:700;text-align:center;color:var(--text)}
+.login-sub{font-size:11px;color:var(--gray);text-align:center;margin-top:2px}
+.login-field{margin-bottom:12px}
+.login-field label{font-size:11px;color:var(--gray);margin-bottom:4px;text-transform:none;letter-spacing:0}
+.login-hint{font-size:10px;color:var(--text-muted);text-align:center;margin-top:10px}
+
+/* Site cards (home) */
+.site-card{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;
+  background:#fff;border:1px solid var(--border);border-radius:10px;margin-bottom:6px;cursor:pointer}
+.site-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-right:8px}
+.site-dot.green{background:var(--green)}
+.site-dot.amber{background:#eab308}
+.site-dot.gray{background:#d1d5db}
+.site-info{flex:1;min-width:0}
+.site-name{font-size:12px;font-weight:600;color:var(--text)}
+.site-cap{font-size:9px;color:var(--text-muted)}
+.site-action{font-size:10px;color:var(--green);font-weight:600;white-space:nowrap}
+
+/* Stats grid */
+.stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px}
+.stat-card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:10px;text-align:center}
+.stat-num{font-size:16px;font-weight:700}
+.stat-label{font-size:9px;color:var(--text-muted);margin-top:2px}
+
+/* Admin table */
+.admin-table{width:100%;border-collapse:collapse;font-size:11px}
+.admin-table th{background:var(--gray-light);padding:6px 8px;text-align:left;font-weight:600;font-size:10px;
+  color:var(--gray);text-transform:uppercase;border-bottom:1px solid var(--border)}
+.admin-table td{padding:6px 8px;border-bottom:1px solid var(--gray-light);vertical-align:middle}
+.admin-table tr:hover td{background:#fafbfc}
+
+/* Modal */
+.modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.4);z-index:200;
+  display:flex;align-items:flex-end;justify-content:center}
+.modal-content{background:#fff;border-radius:14px 14px 0 0;padding:20px;width:100%;max-width:420px;
+  max-height:85vh;overflow-y:auto}
+.modal-title{font-size:14px;font-weight:700;margin-bottom:12px}
+.modal-field{margin-bottom:10px}
+.modal-field label{font-size:11px;text-transform:none;letter-spacing:0;color:var(--gray)}
+
+/* Approvals */
+.approval-card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px}
+.approval-header{display:flex;justify-content:space-between;align-items:start;margin-bottom:6px}
+.approval-site{font-size:13px;font-weight:700}
+.approval-meta{font-size:10px;color:var(--gray);margin-top:2px}
+.approval-stats{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0}
+.approval-stat{font-size:10px;padding:2px 6px;border-radius:6px;background:var(--gray-light)}
+.approval-actions{display:flex;gap:6px;margin-top:8px}
+
+/* History */
+.history-card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:6px;cursor:pointer}
+.history-site{font-size:12px;font-weight:600}
+.history-date{font-size:10px;color:var(--gray)}
+.history-stats{display:flex;gap:8px;margin-top:4px}
+
+/* Admin tabs */
+.admin-tabs{display:flex;gap:0;background:#fff;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:10px}
+.admin-tab{flex:1;padding:8px;text-align:center;font-size:11px;font-weight:600;cursor:pointer;
+  color:var(--gray);border-right:1px solid var(--border)}
+.admin-tab:last-child{border-right:none}
+.admin-tab.active{background:var(--green);color:#fff}
+
+/* Approval filter */
+.filter-pills{display:flex;gap:4px;margin-bottom:8px}
+.filter-pill{padding:4px 10px;border-radius:12px;font-size:10px;font-weight:600;cursor:pointer;
+  border:1px solid var(--border);background:#fff;color:var(--gray)}
+.filter-pill.active{background:var(--green);color:#fff;border-color:var(--green)}
+
+/* Outage block */
+.outage-block{background:#f9fafb;border:1px solid var(--border);border-radius:7px;padding:8px 10px;margin-bottom:6px}
+.outage-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+
+/* Grid helpers */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+.flex-between{display:flex;justify-content:space-between;align-items:center}
+.flex-center{display:flex;align-items:center}
+.gap-4px{gap:4px}
+.gap-6{gap:6px}
+.gap-8{gap:8px}
+.mt-4{margin-top:4px}
+.mt-6{margin-top:6px}
+.mt-8{margin-top:8px}
+.mb-4{margin-bottom:4px}
+.mb-6{margin-bottom:6px}
+.mb-8{margin-bottom:8px}
+.text-large{font-size:15px;font-weight:700}
+.text-green{color:var(--green-dark)}
+.text-red{color:var(--red)}
+.text-amber{color:var(--amber)}
+.text-blue{color:var(--blue)}
+.text-gray{color:var(--gray)}
+.text-hint{font-size:9px;color:var(--text-muted)}
+
+/* Password toggle */
+.pw-wrap{position:relative}
+.pw-wrap input{padding-right:36px}
+.pw-toggle{position:absolute;right:8px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:14px;color:var(--gray);background:none;border:none}
+
+/* Add outage dashed button */
+.btn-dashed{border:1.5px dashed var(--green);color:var(--green);background:transparent;padding:8px;
+  border-radius:7px;font-size:11px;font-weight:600;width:100%;cursor:pointer;font-family:inherit}
+
+/* Ack badge */
+.ack-badge{padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;cursor:pointer;flex-shrink:0}
+.ack-badge.pending{background:var(--amber-light);color:var(--amber);border:1px solid var(--amber-border)}
+.ack-badge.done{background:#dcfce7;color:var(--green-dark);border:1px solid var(--green-border)}
+
+/* Success screen */
+.success-icon{width:48px;height:48px;border-radius:50%;background:#dcfce7;color:var(--green);
+  display:flex;align-items:center;justify-content:center;font-size:24px;margin:0 auto 8px}
+</style>
+</head>
+<body>
+
+<!-- OFFLINE BANNER -->
+<div id="offlineBanner" class="offline-banner">No internet — submissions will be saved locally</div>
+
+<!-- LOGIN SCREEN -->
+<div id="loginScreen" class="login-screen">
+  <div style="text-align:center;margin-bottom:16px">
+    <div style="font-size:18px;font-weight:700;color:var(--green)">PM KUSUM · DGR</div>
+    <div style="font-size:11px;color:var(--gray);margin-top:2px">Stockwell Solar</div>
+  </div>
+  <div class="login-card">
+    <div class="login-title">Login</div>
+    <div class="login-sub">Enter your credentials</div>
+    <div style="height:16px"></div>
+    <div class="login-field">
+      <label>Phone number</label>
+      <input type="tel" id="loginPhone" placeholder="Enter phone number">
+    </div>
+    <div class="login-field">
+      <label>Password</label>
+      <div class="pw-wrap">
+        <input type="password" id="loginPw" placeholder="Enter password">
+        <button class="pw-toggle" onclick="togglePw('loginPw',this)">👁</button>
+      </div>
+    </div>
+    <div id="loginError" class="error-box hidden"></div>
+    <button class="btn btn-primary" onclick="doLogin()" id="loginBtn">Login</button>
+    <div class="login-hint">First login? Use the password set by your admin</div>
+  </div>
+</div>
+
+<!-- FORCE PASSWORD CHANGE -->
+<div id="pwChangeScreen" class="login-screen hidden">
+  <div class="login-card">
+    <div class="login-title">Set your password</div>
+    <div class="login-sub">Choose a new password to continue</div>
+    <div style="height:16px"></div>
+    <div class="login-field">
+      <label>New password</label>
+      <div class="pw-wrap">
+        <input type="password" id="newPw1" placeholder="Min 8 characters">
+        <button class="pw-toggle" onclick="togglePw('newPw1',this)">👁</button>
+      </div>
+    </div>
+    <div class="login-field">
+      <label>Confirm password</label>
+      <div class="pw-wrap">
+        <input type="password" id="newPw2" placeholder="Repeat password">
+        <button class="pw-toggle" onclick="togglePw('newPw2',this)">👁</button>
+      </div>
+    </div>
+    <div id="pwChangeError" class="error-box hidden"></div>
+    <button class="btn btn-primary" onclick="doChangePw()">Save password</button>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="appWrap" class="hidden">
+
+<!-- HEADER BAR (for DGR form steps) -->
+<div id="headerBar" class="header-bar hidden">
+  <div class="flex-between">
+    <div>
+      <div class="header-title" id="headerTitle">Site & Date</div>
+      <div class="header-sub" id="headerSub">Step 1 of 10</div>
+    </div>
+    <div id="headerBadge"></div>
+  </div>
+  <div class="progress-dots" id="progressDots"></div>
+</div>
+
+<!-- SCREENS CONTAINER -->
+<div id="screensWrap">
+
+  <!-- SCREEN 0: HOME -->
+  <div id="screen0" class="screen screen-padded"></div>
+
+  <!-- SCREEN 1: SITE & DATE -->
+  <div id="screen1" class="screen hidden"></div>
+
+  <!-- SCREEN 2: INVERTER GENERATION -->
+  <div id="screen2" class="screen hidden"></div>
+
+  <!-- SCREEN 3: PERFORMANCE -->
+  <div id="screen3" class="screen hidden"></div>
+
+  <!-- SCREEN 4: GRID & PLANT -->
+  <div id="screen4" class="screen hidden"></div>
+
+  <!-- SCREEN 5: TRANSFORMER -->
+  <div id="screen5" class="screen hidden"></div>
+
+  <!-- SCREEN 6: CLEANING -->
+  <div id="screen6" class="screen hidden"></div>
+
+  <!-- SCREEN 7: WEATHER & REMARKS -->
+  <div id="screen7" class="screen hidden"></div>
+
+  <!-- SCREEN 8: PHOTOS -->
+  <div id="screen8" class="screen hidden"></div>
+
+  <!-- SCREEN 9: REVIEW -->
+  <div id="screen9" class="screen hidden"></div>
+
+  <!-- SCREEN 10: SUBMITTED -->
+  <div id="screen10" class="screen hidden"></div>
+
+  <!-- HISTORY SCREEN -->
+  <div id="screenHistory" class="screen screen-padded hidden"></div>
+
+  <!-- APPROVALS SCREEN -->
+  <div id="screenApprovals" class="screen screen-padded hidden"></div>
+
+  <!-- ADMIN SCREEN -->
+  <div id="screenAdmin" class="screen screen-padded hidden"></div>
+
+</div>
+
+<!-- NAV BAR (back/next for DGR form) -->
+<div id="navBar" class="nav-bar hidden">
+  <button class="btn btn-secondary" id="btnBack" onclick="goBack()">Back</button>
+  <button class="btn btn-primary" id="btnNext" onclick="goNext()" style="flex:1">Next</button>
+</div>
+
+<!-- BOTTOM TAB BAR -->
+<div id="bottomTabs" class="bottom-tabs hidden"></div>
+
+</div><!-- /appWrap -->
+
+<!-- MODAL -->
+<div id="modalOverlay" class="modal-overlay hidden" onclick="closeModal(event)">
+  <div class="modal-content" id="modalContent" onclick="event.stopPropagation()"></div>
+</div>
+
+<!-- FILE INPUT (hidden) -->
+<input type="file" id="photoInput" accept="image/*" capture="environment" class="hidden" onchange="handlePhoto(event)">
+
+<!-- CSV INPUT (hidden) -->
+<input type="file" id="csvInput" accept=".csv" class="hidden" onchange="handleCSV(event)">
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+// ============================================================
+// SUPABASE CONFIG
+// ============================================================
+const SUPABASE_URL='https://yvlagovdcxwmfkefdrnv.supabase.co';
+const SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl2bGFnb3ZkY3h3bWZrZWZkcm52Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM0ODc3ODQsImV4cCI6MjA4OTA2Mzc4NH0.uYH7pcSo-pi_ksVMTCWsTiLz5hlt5YZMaVuBRLQvlQ0';
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+
+// ============================================================
+// SITE LIST
+// ============================================================
+const DEFAULT_SITES=['Jamola','Dausar','Haspur','Pahel','Khakholi','Jetpura','Sindhu-1','Sindhu-2',
+  'Kherla nagar-1','Kherla nagar-2','Ratnania Cohra','Birmana Tal','Nadiya Tal','Keshloi tal',
+  'Udwala','Bidasar','Kunpalsar','Bhudhro Ki dhani','Ghantel','Dhirasar','Ramdevra-2','Purnadatal',
+  'Badsar','Rajaldesar','Chitawa-1','Chitawa-2','Chitawa-3','Lalasar','Pilania pau','Choti serwa',
+  'Rohisa','Khunkhuna','Satra-1','Satra-2','Godwanti Tal'];
+
+// ============================================================
+// GLOBAL STATE
+// ============================================================
+let session=null; // {phone,name,role,assigned_sites,loggedIn}
+let sites=[]; // site_config rows
+let currentScreen=0;
+let currentTab='dgr'; // dgr|history|approvals|admin
+let formData={};
+let photoFiles=[];
+let photoLabels=[];
+let photoSlotTarget=0;
+let acknowledgements={inv_zero:false,pr_low:false,temp_high:false};
+let todaySubmissions={}; // {siteName: submission}
+
+// ============================================================
+// PASSWORD HASHING
+// ============================================================
+async function hashPassword(pwd){
+  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(pwd));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+function togglePw(id,btn){
+  const inp=document.getElementById(id);
+  if(inp.type==='password'){inp.type='text';btn.textContent='🙈';}
+  else{inp.type='password';btn.textContent='👁';}
+}
+
+// ============================================================
+// AUTH
+// ============================================================
+async function doLogin(){
+  const phone=document.getElementById('loginPhone').value.trim();
+  const pw=document.getElementById('loginPw').value;
+  const errEl=document.getElementById('loginError');
+  errEl.classList.add('hidden');
+  if(!phone||!pw){errEl.textContent='Enter phone and password';errEl.classList.remove('hidden');return;}
+  const hash=await hashPassword(pw);
+  const{data,error}=await sb.from('users').select('*').eq('phone',phone).single();
+  if(error||!data){errEl.textContent='User not found';errEl.classList.remove('hidden');return;}
+  if(data.password_hash!==hash){errEl.textContent='Incorrect password';errEl.classList.remove('hidden');return;}
+  session={phone:data.phone,name:data.name,role:data.role,assigned_sites:data.assigned_sites||[],loggedIn:true,userId:data.id,must_change_pw:data.must_change_pw};
+  localStorage.setItem('dgr_session',JSON.stringify(session));
+  if(session.must_change_pw){
+    document.getElementById('loginScreen').classList.add('hidden');
+    document.getElementById('pwChangeScreen').classList.remove('hidden');
+  } else {
+    enterApp();
+  }
+}
+
+async function doChangePw(){
+  const p1=document.getElementById('newPw1').value;
+  const p2=document.getElementById('newPw2').value;
+  const errEl=document.getElementById('pwChangeError');
+  errEl.classList.add('hidden');
+  if(p1.length<8){errEl.textContent='Min 8 characters';errEl.classList.remove('hidden');return;}
+  if(p1!==p2){errEl.textContent='Passwords do not match';errEl.classList.remove('hidden');return;}
+  const hash=await hashPassword(p1);
+  await sb.from('users').update({password_hash:hash,must_change_pw:false}).eq('phone',session.phone);
+  session.must_change_pw=false;
+  localStorage.setItem('dgr_session',JSON.stringify(session));
+  document.getElementById('pwChangeScreen').classList.add('hidden');
+  enterApp();
+}
+
+function logout(){
+  localStorage.removeItem('dgr_session');
+  session=null;
+  document.getElementById('appWrap').classList.add('hidden');
+  document.getElementById('bottomTabs').classList.add('hidden');
+  document.getElementById('loginScreen').classList.remove('hidden');
+}
+
+// ============================================================
+// APP ENTRY
+// ============================================================
+async function enterApp(){
+  document.getElementById('loginScreen').classList.add('hidden');
+  document.getElementById('pwChangeScreen').classList.add('hidden');
+  document.getElementById('appWrap').classList.remove('hidden');
+  await loadSites();
+  buildBottomTabs();
+  switchTab('dgr');
+}
+
+async function loadSites(){
+  try{
+    const{data}=await sb.from('site_config').select('*').eq('active',true).order('site_name');
+    if(data&&data.length>0){sites=data;localStorage.setItem('dgr_sites',JSON.stringify(data));}
+    else{
+      // Pre-populate if empty
+      const rows=DEFAULT_SITES.map(n=>({site_name:n,dc_capacity_kw:null,ac_capacity_kw:null,inverter_count:null,strings_per_inv:null}));
+      await sb.from('site_config').upsert(rows,{onConflict:'site_name'});
+      const{data:d2}=await sb.from('site_config').select('*').eq('active',true).order('site_name');
+      sites=d2||[];
+      localStorage.setItem('dgr_sites',JSON.stringify(sites));
+    }
+  }catch(e){
+    const cached=localStorage.getItem('dgr_sites');
+    if(cached)sites=JSON.parse(cached);
+  }
+}
+
+// ============================================================
+// BOTTOM TABS
+// ============================================================
+function buildBottomTabs(){
+  const el=document.getElementById('bottomTabs');
+  let tabs=[
+    {id:'dgr',label:'DGR',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>'},
+    {id:'history',label:'History',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>'}
+  ];
+  if(session.role==='manager'||session.role==='admin'){
+    tabs.push({id:'approvals',label:'Approvals',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>'});
+  }
+  if(session.role==='admin'){
+    tabs.push({id:'admin',label:'Admin',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197"/></svg>'});
+  }
+  el.innerHTML=tabs.map(t=>`<div class="bottom-tab${t.id==='dgr'?' active':''}" data-tab="${t.id}" onclick="switchTab('${t.id}')">${t.icon}<span>${t.label}</span></div>`).join('');
+  el.classList.remove('hidden');
+}
+
+function switchTab(tab){
+  currentTab=tab;
+  document.querySelectorAll('.bottom-tab').forEach(t=>{t.classList.toggle('active',t.dataset.tab===tab);});
+  // Hide all screens
+  document.querySelectorAll('#screensWrap > div').forEach(d=>d.classList.add('hidden'));
+  document.getElementById('headerBar').classList.add('hidden');
+  document.getElementById('navBar').classList.add('hidden');
+  if(tab==='dgr'){showHomeScreen();}
+  else if(tab==='history'){showHistory();}
+  else if(tab==='approvals'){showApprovals();}
+  else if(tab==='admin'){showAdmin();}
+}
+
+// ============================================================
+// SCREEN 0: HOME
+// ============================================================
+async function showHomeScreen(){
+  currentScreen=0;
+  document.getElementById('headerBar').classList.add('hidden');
+  document.getElementById('navBar').classList.add('hidden');
+  const el=document.getElementById('screen0');
+  el.classList.remove('hidden');
+
+  const mySites=session.role==='engineer'?sites.filter(s=>session.assigned_sites.includes(s.site_name)):sites;
+  const today=new Date().toISOString().split('T')[0];
+
+  // Load today's submissions
+  try{
+    const{data}=await sb.from('dgr_submissions').select('site_name,status,submitted_by_name,created_at').eq('report_date',today);
+    todaySubmissions={};
+    if(data)data.forEach(d=>{todaySubmissions[d.site_name]=d;});
+  }catch(e){}
+
+  let approved=0,pending=0,notDone=0;
+  mySites.forEach(s=>{
+    const sub=todaySubmissions[s.site_name];
+    if(sub&&sub.status==='approved')approved++;
+    else if(sub)pending++;
+    else notDone++;
+  });
+
+  const dateStr=new Date().toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
+
+  el.innerHTML=`
+    <div style="padding:4px 0 8px">
+      <div style="font-size:14px;font-weight:700">Daily Generation Report</div>
+      <div style="font-size:10px;color:var(--gray)">Welcome, ${session.name||session.phone}</div>
+    </div>
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-num" style="color:var(--green)">${approved}</div><div class="stat-label">Approved</div></div>
+      <div class="stat-card"><div class="stat-num" style="color:#eab308">${pending}</div><div class="stat-label">Pending</div></div>
+      <div class="stat-card"><div class="stat-num" style="color:var(--gray)">${notDone}</div><div class="stat-label">Not done</div></div>
+    </div>
+    <div class="card-title">Your sites today — ${dateStr}</div>
+    ${mySites.map(s=>{
+      const sub=todaySubmissions[s.site_name];
+      let dotClass='gray',badgeHtml='',actionHtml=`<span class="site-action">Fill now →</span>`;
+      if(sub&&sub.status==='approved'){dotClass='green';badgeHtml='<span class="badge badge-green">Approved</span>';actionHtml='';}
+      else if(sub){dotClass='amber';badgeHtml='<span class="badge badge-yellow">Pending</span>';actionHtml=`<span class="site-action">Edit →</span>`;}
+      const cap=s.dc_capacity_kw?`${s.dc_capacity_kw} kW DC`:'Not configured';
+      return `<div class="site-card" onclick="startDGR('${s.site_name}')">
+        <div class="site-dot ${dotClass}"></div>
+        <div class="site-info"><div class="site-name">${s.site_name}</div><div class="site-cap">${cap}</div></div>
+        <div style="display:flex;align-items:center;gap:6px">${badgeHtml}${actionHtml}</div>
+      </div>`;
+    }).join('')}
+    ${mySites.length===0?'<div class="card" style="text-align:center;color:var(--gray);padding:20px">No sites assigned. Contact your admin.</div>':''}
+    <div style="text-align:center;margin-top:12px">
+      <span style="font-size:10px;color:var(--text-muted);cursor:pointer" onclick="logout()">Logout</span>
+    </div>
+  `;
+}
+
+// ============================================================
+// START DGR FORM
+// ============================================================
+function startDGR(siteName){
+  const site=sites.find(s=>s.site_name===siteName);
+  formData={
+    site_name:siteName,
+    report_date:new Date().toISOString().split('T')[0],
+    dc_capacity_kw:site?site.dc_capacity_kw:null,
+    ac_capacity_kw:site?site.ac_capacity_kw:null,
+    inverter_count:site?site.inverter_count:6,
+    strings_per_inv:site?site.strings_per_inv:[],
+    submitted_by_name:session.name||session.phone,
+    submitted_by_phone:session.phone,
+    inv_gen:[],
+    total_gen_kwh:0,
+    peak_radiation_wm2:null,
+    poa_kwh_m2:null,
+    peak_power_kwh:null,
+    dc_cuf_pct:0,ac_cuf_pct:0,pr_pct:0,
+    grid_outage:false,grid_outage_details:[],
+    plant_breakdown:false,plant_breakdown_text:'',
+    wti_hv_c:null,wti_lv_c:null,wti_max_c:null,
+    oil_level_pct:null,
+    cleaning_c1_status:'not-started',cleaning_c1_tds:null,
+    cleaning_c2_status:'not-started',cleaning_c2_tds:null,
+    cleaning_c3_status:'not-started',cleaning_c3_tds:null,
+    weather:'',remarks:'',
+    image_urls:[]
+  };
+  photoFiles=[];
+  photoLabels=[];
+  acknowledgements={inv_zero:false,pr_low:false,temp_high:false};
+  // Fetch weather data silently
+  fetchWeatherAuto(site);
+  goToScreen(1);
+}
+
+// ============================================================
+// WEATHER AUTO-CAPTURE (silent)
+// ============================================================
+async function fetchWeatherAuto(site){
+  if(!site||!site.latitude||!site.longitude)return;
+  try{
+    const d=formData.report_date;
+    const url=`https://api.open-meteo.com/v1/forecast?latitude=${site.latitude}&longitude=${site.longitude}&hourly=temperature_2m,cloud_cover,shortwave_radiation,precipitation,wind_speed_10m&timezone=Asia/Kolkata&start_date=${d}&end_date=${d}`;
+    const resp=await fetch(url);
+    const json=await resp.json();
+    if(!json.hourly)return;
+    const h=json.hourly;
+    // Hours 8-17 (indices 8-17)
+    const temps=[],clouds=[],ghis=[],precips=[];
+    for(let i=8;i<=17;i++){
+      if(h.temperature_2m[i]!=null)temps.push(h.temperature_2m[i]);
+      if(h.cloud_cover[i]!=null)clouds.push(h.cloud_cover[i]);
+      if(h.shortwave_radiation[i]!=null)ghis.push(h.shortwave_radiation[i]);
+      if(h.precipitation[i]!=null)precips.push(h.precipitation[i]);
+    }
+    formData.weather_auto={
+      gen_hours_temp_max:temps.length?Math.max(...temps):null,
+      gen_hours_temp_avg:temps.length?+(temps.reduce((a,b)=>a+b,0)/temps.length).toFixed(1):null,
+      gen_hours_cloud_pct:clouds.length?+(clouds.reduce((a,b)=>a+b,0)/clouds.length).toFixed(1):null,
+      gen_hours_ghi_peak:ghis.length?Math.max(...ghis):null,
+      gen_hours_ghi_sum:ghis.length?+ghis.reduce((a,b)=>a+b,0).toFixed(1):null,
+      effective_sun_hours:ghis.filter(g=>g>200).length,
+      precipitation_mm:precips.reduce((a,b)=>a+b,0),
+      thermal_loss_pct:temps.length?+(Math.max(0,(Math.max(...temps)-25)*0.4)).toFixed(1):null
+    };
+  }catch(e){/* silent fail */}
+}
+
+// ============================================================
+// SCREEN NAVIGATION
+// ============================================================
+function goToScreen(n){
+  document.querySelectorAll('#screensWrap > div').forEach(d=>d.classList.add('hidden'));
+  currentScreen=n;
+  const el=document.getElementById('screen'+n);
+  el.classList.remove('hidden');
+
+  // Header
+  const hdr=document.getElementById('headerBar');
+  if(n>=1&&n<=9){
+    hdr.classList.remove('hidden');
+    const titles=['','Site & Date','Inverter Generation','Performance','Grid & Plant','Transformer','Cleaning','Weather & Remarks','Photos','Review & Submit'];
+    document.getElementById('headerTitle').textContent=titles[n]||'';
+    document.getElementById('headerSub').textContent=`Step ${n} of 10`;
+    // Badge
+    const badge=document.getElementById('headerBadge');
+    if(n===2&&formData.inverter_count){
+      const totalStr=(formData.strings_per_inv||[]).reduce((a,b)=>a+b,0);
+      badge.innerHTML=`<span class="badge badge-blue">${formData.inverter_count} inv · ${totalStr} str</span>`;
+    } else badge.innerHTML='';
+    // Progress dots
+    const dots=document.getElementById('progressDots');
+    let dotsHtml='';
+    for(let i=1;i<=10;i++){
+      let cls='progress-dot';
+      if(i<n)cls+=' done';else if(i===n)cls+=' active';
+      dotsHtml+=`<div class="${cls}"></div>`;
+    }
+    dots.innerHTML=dotsHtml;
+  } else {
+    hdr.classList.add('hidden');
+  }
+
+  // Nav bar
+  const nav=document.getElementById('navBar');
+  if(n>=1&&n<=9){
+    nav.classList.remove('hidden');
+    document.getElementById('btnBack').classList.toggle('hidden',n===1);
+    const nextBtn=document.getElementById('btnNext');
+    nextBtn.textContent=n===9?'Submit Report':'Next';
+    nextBtn.disabled=false;
+  } else {
+    nav.classList.add('hidden');
+  }
+
+  // Build screen content
+  if(n===1)buildScreen1();
+  else if(n===2)buildScreen2();
+  else if(n===3)buildScreen3();
+  else if(n===4)buildScreen4();
+  else if(n===5)buildScreen5();
+  else if(n===6)buildScreen6();
+  else if(n===7)buildScreen7();
+  else if(n===8)buildScreen8();
+  else if(n===9)buildScreen9();
+  else if(n===10)buildScreen10();
+
+  // Hide bottom tabs in DGR form
+  document.getElementById('bottomTabs').classList.toggle('hidden',n>=1&&n<=10);
+
+  window.scrollTo(0,0);
+}
+
+function goBack(){if(currentScreen>1)goToScreen(currentScreen-1);else{switchTab('dgr');}}
+function goNext(){
+  if(currentScreen===9){submitReport();return;}
+  if(currentScreen<10)goToScreen(currentScreen+1);
+}
+
+// ============================================================
+// SCREEN 1: SITE & DATE
+// ============================================================
+function buildScreen1(){
+  const el=document.getElementById('screen1');
+  const mySites=session.role==='engineer'?sites.filter(s=>session.assigned_sites.includes(s.site_name)):sites;
+  const site=sites.find(s=>s.site_name===formData.site_name);
+
+  el.innerHTML=`
+    <div class="card">
+      <div class="card-title">Site details</div>
+      <div style="margin-bottom:8px">
+        <label>Site name</label>
+        <select id="s1Site" class="${formData.site_name?'input-ok':''}" onchange="onSiteChange(this.value)">
+          <option value="">Select site</option>
+          ${mySites.map(s=>`<option value="${s.site_name}"${s.site_name===formData.site_name?' selected':''}>${s.site_name}</option>`).join('')}
+        </select>
+      </div>
+      <div style="margin-bottom:8px">
+        <label>Report date</label>
+        <input type="date" id="s1Date" value="${formData.report_date}" class="input-ok" onchange="onDateChange(this.value)">
+      </div>
+      <div id="s1Duplicate"></div>
+      <div class="grid-2" style="margin-top:6px">
+        <div>
+          <label>DC capacity (kW)</label>
+          <input type="text" value="${formData.dc_capacity_kw||'—'}" readonly class="readonly">
+          <div class="text-hint" style="margin-top:2px">Pre-configured</div>
+        </div>
+        <div>
+          <label>AC capacity (kW)</label>
+          <input type="text" value="${formData.ac_capacity_kw||'—'}" readonly class="readonly">
+          <div class="text-hint" style="margin-top:2px">Pre-configured</div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Submitted by</div>
+      <input type="text" value="${formData.submitted_by_name}" readonly class="readonly">
+    </div>
+  `;
+  checkDuplicate();
+}
+
+function onSiteChange(v){
+  formData.site_name=v;
+  const site=sites.find(s=>s.site_name===v);
+  if(site){
+    formData.dc_capacity_kw=site.dc_capacity_kw;
+    formData.ac_capacity_kw=site.ac_capacity_kw;
+    formData.inverter_count=site.inverter_count||6;
+    formData.strings_per_inv=site.strings_per_inv||[];
+    fetchWeatherAuto(site);
+  }
+  buildScreen1();
+}
+
+function onDateChange(v){
+  formData.report_date=v;
+  checkDuplicate();
+}
+
+async function checkDuplicate(){
+  const el=document.getElementById('s1Duplicate');
+  if(!el)return;
+  if(!formData.site_name||!formData.report_date){el.innerHTML='';return;}
+  try{
+    const{data}=await sb.from('dgr_submissions').select('submitted_by_name,created_at').eq('site_name',formData.site_name).eq('report_date',formData.report_date).single();
+    if(data){
+      const time=new Date(data.created_at).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+      el.innerHTML=`<div class="warning-box">Report already submitted at ${time} by ${data.submitted_by_name} — edit instead?</div>`;
+    } else el.innerHTML='';
+  }catch(e){el.innerHTML='';}
+}
+
+// ============================================================
+// SCREEN 2: INVERTER GENERATION
+// ============================================================
+function buildScreen2(){
+  const el=document.getElementById('screen2');
+  const n=formData.inverter_count||6;
+  const strs=formData.strings_per_inv||[];
+  // Initialize inv_gen array
+  if(!formData.inv_gen||formData.inv_gen.length!==n){
+    formData.inv_gen=new Array(n).fill(0);
+  }
+
+  let rows='';
+  for(let i=0;i<n;i++){
+    const s=strs[i]||0;
+    const gen=formData.inv_gen[i]||0;
+    const perStr=s>0?(gen/s).toFixed(1):'—';
+    const isZero=gen===0&&i<n;
+    rows+=`
+      <div class="inv-num${isZero?' err':''}">INV${i+1}</div>
+      <input type="number" inputmode="decimal" value="${gen||''}" placeholder="0"
+        class="${isZero?'input-err':''}" style="font-size:12px;padding:6px 8px"
+        oninput="onInvGen(${i},this.value)">
+      <div class="inv-str">${s}</div>
+      <div class="inv-per-str">${perStr}</div>
+    `;
+  }
+
+  const total=formData.inv_gen.reduce((a,b)=>a+(+b||0),0);
+  formData.total_gen_kwh=total;
+
+  const zeroInvs=formData.inv_gen.map((v,i)=>v===0?i+1:null).filter(v=>v!==null);
+
+  el.innerHTML=`
+    <div class="card">
+      <div class="flex-between" style="margin-bottom:6px">
+        <div class="card-title" style="margin-bottom:0">Inverter readings</div>
+      </div>
+      <div class="inv-grid">
+        <div class="inv-header">#</div>
+        <div class="inv-header">kWh</div>
+        <div class="inv-header" style="text-align:right">Str</div>
+        <div class="inv-header" style="text-align:right">kWh/str</div>
+        ${rows}
+      </div>
+    </div>
+    <div class="auto-calc">
+      <div class="auto-calc-label">Total generation</div>
+      <div class="auto-calc-value">${total.toFixed(1)} kWh</div>
+    </div>
+    ${zeroInvs.length>0?`<div class="error-box">INV-${zeroInvs.join(', INV-')} shows zero kWh — verify before proceeding</div>`:''}
+  `;
+}
+
+function onInvGen(idx,val){
+  formData.inv_gen[idx]=parseFloat(val)||0;
+  buildScreen2();
+}
+
+// ============================================================
+// SCREEN 3: PERFORMANCE
+// ============================================================
+function buildScreen3(){
+  const el=document.getElementById('screen3');
+  const total=formData.total_gen_kwh||0;
+  const dc=formData.dc_capacity_kw||0;
+  const ac=formData.ac_capacity_kw||0;
+  const poa=formData.poa_kwh_m2||0;
+
+  const dcCuf=dc>0?((total/(dc*24))*100):0;
+  const acCuf=ac>0?((total/(ac*24))*100):0;
+  const pr=poa>0&&dc>0?((total/(poa*dc))*100):0;
+  formData.dc_cuf_pct=+dcCuf.toFixed(2);
+  formData.ac_cuf_pct=+acCuf.toFixed(2);
+  formData.pr_pct=+pr.toFixed(2);
+
+  const prWarning=pr>0&&pr<70;
+
+  el.innerHTML=`
+    <div class="card">
+      <div class="card-title">Irradiation data</div>
+      <div class="grid-2">
+        <div>
+          <label>Peak radiation (W/m²)</label>
+          <input type="number" inputmode="decimal" value="${formData.peak_radiation_wm2||''}" placeholder="0"
+            oninput="formData.peak_radiation_wm2=parseFloat(this.value)||0">
+        </div>
+        <div>
+          <label>POA irradiation (kWh/m²)</label>
+          <input type="number" inputmode="decimal" value="${formData.poa_kwh_m2||''}" placeholder="0"
+            oninput="formData.poa_kwh_m2=parseFloat(this.value)||0;buildScreen3()">
+        </div>
+      </div>
+      <div style="margin-top:6px">
+        <label>Peak power (kWh)</label>
+        <input type="number" inputmode="decimal" value="${formData.peak_power_kwh||''}" placeholder="0"
+          oninput="formData.peak_power_kwh=parseFloat(this.value)||0">
+      </div>
+    </div>
+    <div class="grid-3">
+      <div class="auto-calc">
+        <div class="auto-calc-label">DC CUF</div>
+        <div class="auto-calc-value">${dcCuf.toFixed(2)}%</div>
+      </div>
+      <div class="auto-calc">
+        <div class="auto-calc-label">AC CUF</div>
+        <div class="auto-calc-value">${acCuf.toFixed(2)}%</div>
+      </div>
+      <div class="auto-calc">
+        <div class="auto-calc-label">PR</div>
+        <div class="auto-calc-value">${pr.toFixed(2)}%</div>
+      </div>
+    </div>
+    ${prWarning?`<div class="warning-box">PR ${pr.toFixed(1)}% seems low — grid outage may explain this</div>`:''}
+  `;
+}
+
+// ============================================================
+// SCREEN 4: GRID & PLANT
+// ============================================================
+function buildScreen4(){
+  const el=document.getElementById('screen4');
+  const outages=formData.grid_outage_details||[];
+
+  let outageHtml='';
+  if(formData.grid_outage){
+    outages.forEach((o,i)=>{
+      outageHtml+=`
+        <div class="outage-block">
+          <div class="outage-grid">
+            <div><label>From</label><input type="time" value="${o.from||''}" onchange="formData.grid_outage_details[${i}].from=this.value"></div>
+            <div><label>To</label><input type="time" value="${o.to||''}" onchange="formData.grid_outage_details[${i}].to=this.value"></div>
+          </div>
+          <div style="margin-top:4px"><label>Reason</label><input type="text" value="${o.reason||''}" placeholder="Reason" onchange="formData.grid_outage_details[${i}].reason=this.value"></div>
+          <div style="text-align:right;margin-top:4px"><span style="font-size:10px;color:var(--red);cursor:pointer" onclick="removeOutage(${i})">Remove</span></div>
+        </div>`;
+    });
+  }
+
+  el.innerHTML=`
+    <div class="card">
+      <div class="flex-between">
+        <div>
+          <div style="font-size:12px;font-weight:600">Grid outage</div>
+          <div class="text-hint">Any disruption today?</div>
+        </div>
+        <div class="toggle${formData.grid_outage?' on':''}" onclick="toggleGridOutage()"></div>
+      </div>
+      ${formData.grid_outage?`
+        <div style="margin-top:8px">
+          ${outageHtml}
+          <button class="btn-dashed" onclick="addOutage()">+ Add outage window</button>
+        </div>
+      `:''}
+    </div>
+    <div class="card">
+      <div class="flex-between">
+        <div>
+          <div style="font-size:12px;font-weight:600">Plant breakdown</div>
+          <div class="text-hint">Any equipment failure?</div>
+        </div>
+        <div class="toggle${formData.plant_breakdown?' on':''}" onclick="toggleBreakdown()"></div>
+      </div>
+      ${formData.plant_breakdown?`
+        <div style="margin-top:8px">
+          <label>Description</label>
+          <textarea placeholder="Describe the breakdown..." oninput="formData.plant_breakdown_text=this.value">${formData.plant_breakdown_text||''}</textarea>
+        </div>
+      `:''}
+    </div>
+  `;
+}
+
+function toggleGridOutage(){
+  formData.grid_outage=!formData.grid_outage;
+  if(formData.grid_outage&&formData.grid_outage_details.length===0){formData.grid_outage_details=[{from:'',to:'',reason:''}];}
+  buildScreen4();
+}
+function toggleBreakdown(){formData.plant_breakdown=!formData.plant_breakdown;buildScreen4();}
+function addOutage(){formData.grid_outage_details.push({from:'',to:'',reason:''});buildScreen4();}
+function removeOutage(i){formData.grid_outage_details.splice(i,1);buildScreen4();}
+
+// ============================================================
+// SCREEN 5: TRANSFORMER
+// ============================================================
+function buildScreen5(){
+  const el=document.getElementById('screen5');
+  const hv=formData.wti_hv_c||0;
+  const lv=formData.wti_lv_c||0;
+  const mx=formData.wti_max_c||0;
+  const oil=formData.oil_level_pct||0;
+
+  function tempColor(v){return v>85?'red':v>=75?'amber':'green';}
+  function oilColor(v){return v<30?'red':v<=50?'amber':'green';}
+  function oilLabel(v){return v<30?'Low':v<=50?'Caution':'Normal';}
+  function oilBadge(v){
+    const c=oilColor(v);
+    const cls=c==='green'?'badge-green':c==='amber'?'badge-yellow':'badge-red';
+    return `<span class="badge ${cls}">${oilLabel(v)}</span>`;
+  }
+
+  el.innerHTML=`
+    <div class="card">
+      <div class="card-title">Winding temperature (WTI)</div>
+      <div class="grid-3">
+        <div>
+          <label>HV (°C)</label>
+          <input type="number" inputmode="decimal" style="font-size:15px;font-weight:700;text-align:center"
+            value="${formData.wti_hv_c||''}" placeholder="0"
+            oninput="formData.wti_hv_c=parseFloat(this.value)||0;buildScreen5()">
+          <div class="level-bar"><div class="level-fill ${tempColor(hv)}" style="width:${Math.min(hv,120)/1.2}%"></div></div>
+          <div class="text-hint" style="margin-top:2px;text-align:center">${hv>0?tempColor(hv).toUpperCase():''}</div>
+        </div>
+        <div>
+          <label>LV (°C)</label>
+          <input type="number" inputmode="decimal" style="font-size:15px;font-weight:700;text-align:center"
+            value="${formData.wti_lv_c||''}" placeholder="0"
+            oninput="formData.wti_lv_c=parseFloat(this.value)||0;buildScreen5()">
+          <div class="level-bar"><div class="level-fill ${tempColor(lv)}" style="width:${Math.min(lv,120)/1.2}%"></div></div>
+          <div class="text-hint" style="margin-top:2px;text-align:center">${lv>0?tempColor(lv).toUpperCase():''}</div>
+        </div>
+        <div>
+          <label>Max (°C)</label>
+          <input type="number" inputmode="decimal" style="font-size:15px;font-weight:700;text-align:center${mx>85?';border-color:var(--red-border);background:#fff5f5':''}"
+            value="${formData.wti_max_c||''}" placeholder="0"
+            oninput="formData.wti_max_c=parseFloat(this.value)||0;buildScreen5()">
+          <div class="level-bar"><div class="level-fill ${tempColor(mx)}" style="width:${Math.min(mx,120)/1.2}%"></div></div>
+          <div class="text-hint" style="margin-top:2px;text-align:center">${mx>0?tempColor(mx).toUpperCase():''}</div>
+        </div>
+      </div>
+      ${mx>85?`<div class="warning-box" style="margin-top:6px">Max temp ${mx}°C exceeds 85°C limit — flagged for manager review</div>`:''}
+    </div>
+    <div class="card">
+      <div class="flex-between" style="margin-bottom:6px">
+        <div class="card-title" style="margin-bottom:0">Oil level (OTI)</div>
+        ${oil>0?oilBadge(oil):''}
+      </div>
+      <input type="number" inputmode="decimal" value="${formData.oil_level_pct||''}" placeholder="0"
+        style="font-size:15px;font-weight:700" oninput="formData.oil_level_pct=parseFloat(this.value)||0;buildScreen5()">
+      <div class="level-bar oil" style="margin-top:6px"><div class="level-fill ${oilColor(oil)}" style="width:${Math.min(oil,100)}%"></div></div>
+      <div class="flex-between" style="margin-top:4px">
+        <span class="text-hint">0% Empty</span>
+        <span class="text-hint" style="font-weight:600">${oil}%</span>
+        <span class="text-hint">100% Full</span>
+      </div>
+      <div class="text-hint" style="margin-top:4px">Refill recommended below 30%</div>
+    </div>
+  `;
+}
+
+// ============================================================
+// SCREEN 6: CLEANING
+// ============================================================
+function buildScreen6(){
+  const el=document.getElementById('screen6');
+  const day=new Date(formData.report_date).getDate();
+  const month=new Date(formData.report_date).getMonth();
+  const year=new Date(formData.report_date).getFullYear();
+
+  function cycleState(cStart,cEnd){
+    if(day>=cStart&&day<=cEnd)return 'active';
+    if(day>cEnd)return 'past';
+    return 'future';
+  }
+
+  function dateRange(cStart,cEnd){
+    const s=new Date(year,month,cStart);
+    const e=new Date(year,month,cEnd);
+    return `${s.toLocaleDateString('en-IN',{day:'numeric',month:'short'})} – ${e.toLocaleDateString('en-IN',{day:'numeric',month:'short'})}`;
+  }
+
+  const cycles=[
+    {n:1,start:1,end:10,statusKey:'cleaning_c1_status',tdsKey:'cleaning_c1_tds'},
+    {n:2,start:11,end:20,statusKey:'cleaning_c2_status',tdsKey:'cleaning_c2_tds'},
+    {n:3,start:21,end:31,statusKey:'cleaning_c3_status',tdsKey:'cleaning_c3_tds'}
+  ];
+
+  const statuses=['not-started','in-progress','partial','complete'];
+  const statusLabels={'not-started':'Not Started','in-progress':'In Progress','partial':'Partial','complete':'Complete'};
+
+  let html='<div class="card"><div class="card-title">Module cleaning</div>';
+  cycles.forEach(c=>{
+    const state=cycleState(c.start,c.end);
+    const curStatus=formData[c.statusKey]||'not-started';
+    const isLocked=state==='future'||(curStatus==='complete'&&session.role==='engineer');
+
+    let badgeCls='badge-gray';
+    if(state==='active')badgeCls='badge-blue';
+    if(curStatus==='complete')badgeCls='badge-green';
+    if(curStatus==='partial')badgeCls='badge-yellow';
+
+    const badgeText=state==='future'?'Locked':state==='past'?statusLabels[curStatus]||'Past':statusLabels[curStatus];
+
+    html+=`<div class="cycle-block${isLocked?' locked':''}">
+      <div class="flex-between" style="margin-bottom:6px">
+        <div>
+          <div style="font-size:12px;font-weight:700">Cycle ${c.n}</div>
+          <div class="text-hint">Days ${c.start}–${c.end} · ${dateRange(c.start,c.end)}</div>
+        </div>
+        <span class="badge ${badgeCls}">${badgeText}</span>
+      </div>`;
+
+    if(state==='active'&&!isLocked){
+      html+=`<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px">`;
+      statuses.forEach(s=>{
+        const sel=curStatus===s?' selected':'';
+        html+=`<div class="status-pill ${s}${sel}" onclick="setCycleStatus('${c.statusKey}',this,'${s}')">${statusLabels[s]}</div>`;
+      });
+      html+=`</div>
+        <label>TDS (ppm)</label>
+        <input type="number" inputmode="decimal" value="${formData[c.tdsKey]||''}" placeholder="TDS value"
+          oninput="formData['${c.tdsKey}']=parseFloat(this.value)||0">`;
+    } else if(state==='future'){
+      const availDate=new Date(year,month,c.start);
+      html+=`<div class="text-hint">Available from ${availDate.toLocaleDateString('en-IN',{day:'numeric',month:'short'})}</div>`;
+    }
+
+    html+=`</div>`;
+  });
+  html+='</div>';
+  el.innerHTML=html;
+}
+
+function setCycleStatus(key,elem,status){
+  formData[key]=status;
+  buildScreen6();
+}
+
+// ============================================================
+// SCREEN 7: WEATHER & REMARKS
+// ============================================================
+function buildScreen7(){
+  const el=document.getElementById('screen7');
+  const weathers=['Sunny','Partly cloudy','Cloudy','Hazy','Dust storm'];
+
+  el.innerHTML=`
+    <div class="card">
+      <div class="card-title">Weather condition</div>
+      <div class="weather-pills">
+        ${weathers.map(w=>`<div class="weather-pill${formData.weather===w?' selected':''}" onclick="formData.weather='${w}';buildScreen7()">${w}</div>`).join('')}
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Remarks</div>
+      <textarea rows="4" placeholder="Any site observations..." oninput="formData.remarks=this.value">${formData.remarks||''}</textarea>
+    </div>
+    <div class="card">
+      <div class="card-title">Submitted by</div>
+      <input type="text" value="${formData.submitted_by_name}" readonly class="readonly">
+    </div>
+  `;
+}
+
+// ============================================================
+// SCREEN 8: PHOTOS
+// ============================================================
+function buildScreen8(){
+  const el=document.getElementById('screen8');
+  const maxPhotos=5;
+
+  let slotsHtml='';
+  for(let i=0;i<maxPhotos;i++){
+    if(photoFiles[i]){
+      slotsHtml+=`<div class="photo-slot filled" onclick="removePhoto(${i})">
+        <span style="font-size:16px">📷</span>
+        <span>${photoFiles[i].name.substring(0,12)}</span>
+      </div>`;
+    } else {
+      slotsHtml+=`<div class="photo-slot empty" onclick="triggerPhoto(${i})">
+        <span style="font-size:22px">+</span>
+        <span>Add photo</span>
+      </div>`;
+    }
+  }
+
+  let labelsHtml='';
+  photoFiles.forEach((f,i)=>{
+    if(f){
+      labelsHtml+=`<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+        <span class="badge badge-green">${i+1}</span>
+        <input type="text" placeholder="Photo label" value="${photoLabels[i]||''}" style="flex:1"
+          oninput="photoLabels[${i}]=this.value">
+      </div>`;
+    }
+  });
+
+  el.innerHTML=`
+    <div class="card">
+      <div class="card-title">Site photos</div>
+      <div class="text-hint" style="margin-bottom:6px">Tap to capture or upload · max 5 photos · 5MB each</div>
+      <div class="photo-grid">${slotsHtml}</div>
+    </div>
+    ${labelsHtml?`<div class="card"><div class="card-title">Photo labels</div>${labelsHtml}</div>`:''}
+  `;
+}
+
+function triggerPhoto(idx){
+  photoSlotTarget=idx;
+  document.getElementById('photoInput').click();
+}
+
+function handlePhoto(e){
+  const file=e.target.files[0];
+  if(!file)return;
+  if(file.size>5*1024*1024){alert('Photo must be under 5MB');return;}
+  photoFiles[photoSlotTarget]=file;
+  photoLabels[photoSlotTarget]=photoLabels[photoSlotTarget]||'';
+  e.target.value='';
+  buildScreen8();
+}
+
+function removePhoto(idx){
+  photoFiles[idx]=null;
+  photoLabels[idx]='';
+  buildScreen8();
+}
+
+// ============================================================
+// SCREEN 9: REVIEW & SUBMIT
+// ============================================================
+function buildScreen9(){
+  const el=document.getElementById('screen9');
+
+  // Validations
+  const zeroInvs=formData.inv_gen.filter(v=>v===0).length;
+  const prLow=formData.pr_pct>0&&formData.pr_pct<70;
+  const tempHigh=(formData.wti_max_c||0)>85;
+
+  let valRows='';
+
+  // Duplicate check
+  valRows+=`<div class="val-row">
+    <div class="v-icon v-icon-ok">✓</div>
+    <div class="val-text">No duplicate submission found</div>
+  </div>`;
+
+  if(zeroInvs>0){
+    valRows+=`<div class="val-row">
+      <div class="v-icon v-icon-warn">!</div>
+      <div class="val-text">${zeroInvs} inverter(s) with zero kWh</div>
+      <div class="ack-badge ${acknowledgements.inv_zero?'done':'pending'}" onclick="acknowledgements.inv_zero=true;buildScreen9()">
+        ${acknowledgements.inv_zero?'Acknowledged':'Acknowledge'}
+      </div>
+    </div>`;
+  }
+
+  if(prLow){
+    valRows+=`<div class="val-row">
+      <div class="v-icon v-icon-warn">!</div>
+      <div class="val-text">PR ${formData.pr_pct}% is below threshold</div>
+      <div class="ack-badge ${acknowledgements.pr_low?'done':'pending'}" onclick="acknowledgements.pr_low=true;buildScreen9()">
+        ${acknowledgements.pr_low?'Acknowledged':'Acknowledge'}
+      </div>
+    </div>`;
+  }
+
+  if(tempHigh){
+    valRows+=`<div class="val-row">
+      <div class="v-icon v-icon-err">!</div>
+      <div class="val-text">Max transformer temp ${formData.wti_max_c}°C exceeds 85°C</div>
+      <div class="ack-badge ${acknowledgements.temp_high?'done':'pending'}" onclick="acknowledgements.temp_high=true;buildScreen9()">
+        ${acknowledgements.temp_high?'Flagged':'Flag'}
+      </div>
+    </div>`;
+  }
+
+  if(!zeroInvs&&!prLow&&!tempHigh){
+    valRows+=`<div class="val-row">
+      <div class="v-icon v-icon-ok">✓</div>
+      <div class="val-text">All checks passed</div>
+    </div>`;
+  }
+
+  // Can submit?
+  let canSubmit=true;
+  if(zeroInvs>0&&!acknowledgements.inv_zero)canSubmit=false;
+  if(prLow&&!acknowledgements.pr_low)canSubmit=false;
+  if(tempHigh&&!acknowledgements.temp_high)canSubmit=false;
+
+  // Summary
+  const photoCount=photoFiles.filter(f=>f).length;
+  const dateStr=formData.report_date?new Date(formData.report_date+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}):'';
+
+  el.innerHTML=`
+    <div class="card">
+      <div class="card-title">Validation checks</div>
+      ${valRows}
+    </div>
+    <div class="card">
+      <div class="card-title">Summary</div>
+      <div class="summary-row"><span class="summary-label">Site</span><span class="summary-value text-blue">${formData.site_name}</span></div>
+      <div class="summary-row"><span class="summary-label">Date</span><span class="summary-value text-blue">${dateStr}</span></div>
+      <div class="summary-row"><span class="summary-label">Total generation</span><span class="summary-value text-green">${formData.total_gen_kwh.toFixed(1)} kWh</span></div>
+      <div class="summary-row"><span class="summary-label">DC CUF</span><span class="summary-value">${formData.dc_cuf_pct}%</span></div>
+      <div class="summary-row"><span class="summary-label">AC CUF</span><span class="summary-value">${formData.ac_cuf_pct}%</span></div>
+      <div class="summary-row"><span class="summary-label">PR</span><span class="summary-value">${formData.pr_pct}%</span></div>
+      <div class="summary-row"><span class="summary-label">Grid outage</span><span class="summary-value">${formData.grid_outage?'<span class="badge badge-yellow">Yes</span>':'<span class="badge badge-green">No</span>'}</span></div>
+      <div class="summary-row"><span class="summary-label">Transformer max</span><span class="summary-value">${(formData.wti_max_c||0)>85?`<span class="badge badge-red">${formData.wti_max_c}°C</span>`:`<span class="badge badge-green">${formData.wti_max_c||0}°C</span>`}</span></div>
+      <div class="summary-row"><span class="summary-label">Cleaning</span><span class="summary-value"><span class="badge badge-gray">C1:${formData.cleaning_c1_status} C2:${formData.cleaning_c2_status} C3:${formData.cleaning_c3_status}</span></span></div>
+      <div class="summary-row"><span class="summary-label">Photos</span><span class="summary-value">${photoCount}</span></div>
+      <div class="summary-row"><span class="summary-label">Status</span><span class="summary-value"><span class="badge badge-gray">Pending approval</span></span></div>
+    </div>
+  `;
+
+  // Update submit button
+  const nextBtn=document.getElementById('btnNext');
+  nextBtn.textContent='Submit Report';
+  nextBtn.disabled=!canSubmit;
+}
+
+// ============================================================
+// SUBMIT REPORT
+// ============================================================
+async function submitReport(){
+  const btn=document.getElementById('btnNext');
+  btn.disabled=true;
+  btn.textContent='Submitting...';
+
+  try{
+    // Upload photos
+    const uploadedUrls=[];
+    for(let i=0;i<photoFiles.length;i++){
+      const f=photoFiles[i];
+      if(!f)continue;
+      const path=`${formData.site_name}/${formData.report_date}/${Date.now()}_${f.name}`;
+      try{
+        const{data:upData,error:upErr}=await sb.storage.from('dgr-photos').upload(path,f);
+        if(!upErr){
+          const{data:urlData}=sb.storage.from('dgr-photos').getPublicUrl(path);
+          if(urlData)uploadedUrls.push(urlData.publicUrl);
+        }
+      }catch(e){}
+    }
+
+    const payload={
+      site_name:formData.site_name,
+      report_date:formData.report_date,
+      submitted_by_phone:formData.submitted_by_phone,
+      submitted_by_name:formData.submitted_by_name,
+      dc_capacity_kw:formData.dc_capacity_kw,
+      ac_capacity_kw:formData.ac_capacity_kw,
+      inv_gen:formData.inv_gen,
+      inv_strings:formData.strings_per_inv,
+      total_gen_kwh:formData.total_gen_kwh,
+      peak_radiation_wm2:formData.peak_radiation_wm2,
+      poa_kwh_m2:formData.poa_kwh_m2,
+      peak_power_kwh:formData.peak_power_kwh,
+      ac_cuf_pct:formData.ac_cuf_pct,
+      dc_cuf_pct:formData.dc_cuf_pct,
+      pr_pct:formData.pr_pct,
+      grid_outage:formData.grid_outage,
+      grid_outage_details:formData.grid_outage_details.length>0?formData.grid_outage_details:null,
+      plant_breakdown:formData.plant_breakdown,
+      plant_breakdown_text:formData.plant_breakdown_text||null,
+      wti_hv_c:formData.wti_hv_c,
+      wti_lv_c:formData.wti_lv_c,
+      wti_max_c:formData.wti_max_c,
+      oil_level_pct:formData.oil_level_pct,
+      cleaning_c1_status:formData.cleaning_c1_status,
+      cleaning_c1_tds:formData.cleaning_c1_tds,
+      cleaning_c2_status:formData.cleaning_c2_status,
+      cleaning_c2_tds:formData.cleaning_c2_tds,
+      cleaning_c3_status:formData.cleaning_c3_status,
+      cleaning_c3_tds:formData.cleaning_c3_tds,
+      weather:formData.weather,
+      remarks:formData.remarks,
+      image_urls:uploadedUrls,
+      weather_auto:formData.weather_auto||null
+    };
+
+    if(navigator.onLine){
+      const{error}=await sb.from('dgr_submissions').upsert(payload,{onConflict:'site_name,report_date'});
+      if(error){
+        await saveOffline(payload);
+      }
+    } else {
+      await saveOffline(payload);
+    }
+
+    goToScreen(10);
+  }catch(e){
+    btn.disabled=false;
+    btn.textContent='Submit Report';
+    alert('Error submitting: '+e.message);
+  }
+}
+
+// ============================================================
+// SCREEN 10: SUBMITTED
+// ============================================================
+function buildScreen10(){
+  const el=document.getElementById('screen10');
+  const dateStr=formData.report_date?new Date(formData.report_date+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}):'';
+  const waMsg=buildWhatsAppMsg();
+
+  el.innerHTML=`
+    <div style="text-align:center;padding:20px 0">
+      <div class="success-icon">✓</div>
+      <div style="font-size:16px;font-weight:700;color:var(--green);margin-bottom:4px">Report submitted!</div>
+      <div style="font-size:11px;color:var(--gray)">${formData.site_name} · ${dateStr} · Awaiting manager approval</div>
+    </div>
+    <div class="card" style="background:var(--green-light);border-color:var(--green-border)">
+      <div style="font-size:11px;display:flex;flex-direction:column;gap:6px">
+        <div class="flex-between"><span>Saved to database</span><span style="color:var(--green-dark);font-weight:600">✓ Done</span></div>
+        <div class="flex-between"><span>Manager approval</span><span style="color:var(--amber);font-weight:600">⏳ Pending</span></div>
+        <div class="flex-between"><span>Sheet sync</span><span style="color:var(--gray);font-weight:600">— After approval</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">WhatsApp summary</div>
+      <div class="wa-preview">${escHtml(waMsg)}</div>
+      <button class="btn-whatsapp" onclick="shareWhatsApp()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492l4.625-1.476A11.929 11.929 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818c-2.168 0-4.19-.578-5.938-1.586l-.425-.253-2.744.877.875-2.685-.278-.44A9.777 9.777 0 012.182 12c0-5.422 4.396-9.818 9.818-9.818 5.422 0 9.818 4.396 9.818 9.818 0 5.422-4.396 9.818-9.818 9.818z"/></svg>
+        Share on WhatsApp
+      </button>
+    </div>
+    <button class="btn btn-secondary" style="max-width:none;width:100%" onclick="switchTab('dgr')">Back to home</button>
+  `;
+}
+
+function buildWhatsAppMsg(){
+  const dc_mw=formData.dc_capacity_kw?(formData.dc_capacity_kw/1000).toFixed(2):'—';
+  const ac_mw=formData.ac_capacity_kw?(formData.ac_capacity_kw/1000).toFixed(2):'—';
+  const d=formData.report_date?formData.report_date.split('-').reverse().join('-'):'';
+
+  let invLines='';
+  const inv=formData.inv_gen||[];
+  for(let i=0;i<inv.length;i++){
+    if(i>0&&i%4===0)invLines+='\n';
+    else if(i>0)invLines+=' | ';
+    invLines+=`Inv ${i+1}: ${inv[i]} kWh`;
+  }
+
+  let outageLines='';
+  if(formData.grid_outage&&formData.grid_outage_details){
+    formData.grid_outage_details.forEach(o=>{
+      outageLines+=`\n  ${o.from||'?'}–${o.to||'?'} · ${o.reason||''}`;
+    });
+  }
+
+  let msg=`TODAY DGR 🌞
+Site name :- ${formData.site_name}
+DC capacity :- ${dc_mw} MW
+AC capacity :- ${ac_mw} MW
+Date :- ${d}
+
+${invLines}
+Total inv generation :- ${formData.total_gen_kwh} kWh
+
+Peak radiation :- ${formData.peak_radiation_wm2||0} W/m²
+POA :- ${formData.poa_kwh_m2||0} kWh/m²
+Peak Power :- ${formData.peak_power_kwh||0} kWh
+Plant AC CUF :- ${formData.ac_cuf_pct}%
+Plant DC CUF :- ${formData.dc_cuf_pct}%
+PR :- ${formData.pr_pct}%
+
+Plant breakdown :- ${formData.plant_breakdown?'Yes\n  '+(formData.plant_breakdown_text||''):'No'}
+Grid outage :- ${formData.grid_outage?'Yes'+outageLines:'No'}
+
+WTI HV :- ${formData.wti_hv_c||0}°C | WTI LV :- ${formData.wti_lv_c||0}°C
+Max temp today :- ${formData.wti_max_c||0}°C | Oil level :- ${formData.oil_level_pct||0}%
+
+Module cleaning :- C1: ${formData.cleaning_c1_status} | C2: ${formData.cleaning_c2_status} | C3: ${formData.cleaning_c3_status}
+Weather :- ${formData.weather||'—'}
+Remarks :- ${formData.remarks||'—'}
+
+Submitted by :- ${formData.submitted_by_name}`;
+  return msg;
+}
+
+function shareWhatsApp(){
+  const msg=buildWhatsAppMsg();
+  window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank');
+}
+
+function escHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+// ============================================================
+// HISTORY
+// ============================================================
+async function showHistory(){
+  const el=document.getElementById('screenHistory');
+  el.classList.remove('hidden');
+  el.innerHTML='<div class="card-title">Submission History</div><div style="text-align:center;color:var(--gray);padding:20px">Loading...</div>';
+
+  try{
+    let query=sb.from('dgr_submissions').select('*').order('report_date',{ascending:false}).limit(50);
+    if(session.role==='engineer'){query=query.eq('submitted_by_phone',session.phone);}
+    const{data}=await query;
+
+    if(!data||data.length===0){
+      el.innerHTML='<div class="card-title">Submission History</div><div class="card" style="text-align:center;color:var(--gray)">No submissions yet</div>';
+      return;
+    }
+
+    el.innerHTML=`<div class="card-title">Submission History</div>
+      ${data.map(d=>{
+        const dateStr=new Date(d.report_date+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
+        const statusCls=d.status==='approved'?'badge-green':d.status==='rejected'?'badge-red':'badge-yellow';
+        return `<div class="history-card">
+          <div class="flex-between">
+            <div><div class="history-site">${d.site_name}</div><div class="history-date">${dateStr} · ${d.submitted_by_name||''}</div></div>
+            <span class="badge ${statusCls}">${d.status}</span>
+          </div>
+          <div class="history-stats">
+            <span class="badge badge-gray">${d.total_gen_kwh||0} kWh</span>
+            <span class="badge badge-gray">PR ${d.pr_pct||0}%</span>
+          </div>
+        </div>`;
+      }).join('')}`;
+  }catch(e){
+    el.innerHTML='<div class="card-title">Submission History</div><div class="error-box">Failed to load history</div>';
+  }
+}
+
+// ============================================================
+// APPROVALS
+// ============================================================
+let approvalFilter='pending';
+async function showApprovals(){
+  const el=document.getElementById('screenApprovals');
+  el.classList.remove('hidden');
+  el.innerHTML='<div class="card-title">Approvals</div><div style="text-align:center;color:var(--gray);padding:20px">Loading...</div>';
+
+  try{
+    let query=sb.from('dgr_submissions').select('*').order('created_at',{ascending:false}).limit(100);
+    if(approvalFilter!=='all')query=query.eq('status',approvalFilter);
+    const{data}=await query;
+
+    const filters=['all','pending','approved','rejected'];
+
+    el.innerHTML=`<div class="card-title">Approvals</div>
+      <div class="filter-pills">
+        ${filters.map(f=>`<div class="filter-pill${f===approvalFilter?' active':''}" onclick="approvalFilter='${f}';showApprovals()">${f.charAt(0).toUpperCase()+f.slice(1)}</div>`).join('')}
+      </div>
+      ${(!data||data.length===0)?'<div class="card" style="text-align:center;color:var(--gray)">No submissions</div>':
+        data.map(d=>{
+          const dateStr=new Date(d.report_date+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'});
+          const flags=[];
+          if((d.wti_max_c||0)>85)flags.push('<span class="badge badge-red">High temp</span>');
+          if((d.pr_pct||0)<70)flags.push('<span class="badge badge-yellow">Low PR</span>');
+          return `<div class="approval-card">
+            <div class="approval-header">
+              <div><div class="approval-site">${d.site_name}</div><div class="approval-meta">${dateStr} · ${d.submitted_by_name||''}</div></div>
+              <span class="badge ${d.status==='approved'?'badge-green':d.status==='rejected'?'badge-red':'badge-yellow'}">${d.status}</span>
+            </div>
+            <div class="approval-stats">
+              <span class="approval-stat">${d.total_gen_kwh||0} kWh</span>
+              <span class="approval-stat">PR ${d.pr_pct||0}%</span>
+              ${flags.join('')}
+            </div>
+            ${d.status==='pending'?`<div class="approval-actions">
+              <button class="btn btn-primary" style="flex:1;padding:8px;font-size:11px" onclick="approveSubmission('${d.id}')">Approve</button>
+              <button class="btn" style="flex:1;padding:8px;font-size:11px;background:var(--red-light);color:var(--red);border:1px solid var(--red-border)" onclick="rejectSubmission('${d.id}')">Reject</button>
+            </div>`:''}
+          </div>`;
+        }).join('')}`;
+  }catch(e){
+    el.innerHTML='<div class="card-title">Approvals</div><div class="error-box">Failed to load</div>';
+  }
+}
+
+async function approveSubmission(id){
+  await sb.from('dgr_submissions').update({status:'approved',reviewed_by:session.name,reviewed_at:new Date().toISOString(),synced_to_sheet:true}).eq('id',id);
+  showApprovals();
+}
+
+async function rejectSubmission(id){
+  const note=prompt('Rejection reason:');
+  if(note===null)return;
+  await sb.from('dgr_submissions').update({status:'rejected',reviewed_by:session.name,review_note:note,reviewed_at:new Date().toISOString()}).eq('id',id);
+  showApprovals();
+}
+
+// ============================================================
+// ADMIN PANEL
+// ============================================================
+let adminTab='users';
+function showAdmin(){
+  const el=document.getElementById('screenAdmin');
+  el.classList.remove('hidden');
+  el.innerHTML=`
+    <div class="admin-tabs">
+      <div class="admin-tab${adminTab==='users'?' active':''}" onclick="adminTab='users';showAdmin()">Users</div>
+      <div class="admin-tab${adminTab==='sites'?' active':''}" onclick="adminTab='sites';showAdmin()">Sites</div>
+      <div class="admin-tab${adminTab==='approvals'?' active':''}" onclick="adminTab='approvals';showAdmin()">Approvals</div>
+      <div class="admin-tab${adminTab==='weather'?' active':''}" onclick="adminTab='weather';showAdmin()">Weather Audit</div>
+    </div>
+    <div id="adminContent"></div>
+  `;
+  if(adminTab==='users')showAdminUsers();
+  else if(adminTab==='sites')showAdminSites();
+  else if(adminTab==='approvals'){approvalFilter='pending';showApprovalInAdmin();}
+  else if(adminTab==='weather')showWeatherAudit();
+}
+
+// ADMIN: USERS
+async function showAdminUsers(){
+  const el=document.getElementById('adminContent');
+  el.innerHTML='<div style="text-align:center;color:var(--gray);padding:10px">Loading...</div>';
+  try{
+    const{data}=await sb.from('users').select('*').order('name');
+    el.innerHTML=`
+      <div style="display:flex;gap:6px;margin-bottom:8px">
+        <button class="btn btn-primary" style="flex:1;padding:8px;font-size:11px" onclick="openUserModal()">+ Add User</button>
+        <button class="btn btn-secondary" style="max-width:none;flex:1;padding:8px;font-size:11px" onclick="document.getElementById('csvInput').click()">Bulk Upload CSV</button>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="admin-table">
+          <thead><tr><th>Phone</th><th>Name</th><th>Role</th><th>Sites</th><th>Actions</th></tr></thead>
+          <tbody>
+            ${(data||[]).map(u=>`<tr>
+              <td>${u.phone}</td>
+              <td>${u.name||'—'}</td>
+              <td><span class="badge badge-${u.role==='admin'?'red':u.role==='manager'?'blue':'green'}">${u.role}</span></td>
+              <td style="font-size:9px;max-width:100px;overflow:hidden;text-overflow:ellipsis">${(u.assigned_sites||[]).join(', ')}</td>
+              <td><span style="color:var(--blue);cursor:pointer;font-size:10px" onclick="openUserModal('${u.id}')">Edit</span></td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  }catch(e){el.innerHTML='<div class="error-box">Failed to load users</div>';}
+}
+
+function openUserModal(userId){
+  const modal=document.getElementById('modalOverlay');
+  const content=document.getElementById('modalContent');
+  const isEdit=!!userId;
+
+  if(isEdit){
+    sb.from('users').select('*').eq('id',userId).single().then(({data:u})=>{
+      content.innerHTML=buildUserForm(u);
+      modal.classList.remove('hidden');
+    });
+  } else {
+    content.innerHTML=buildUserForm(null);
+    modal.classList.remove('hidden');
+  }
+}
+
+function buildUserForm(u){
+  const siteOpts=sites.map(s=>`<option value="${s.site_name}"${u&&u.assigned_sites&&u.assigned_sites.includes(s.site_name)?' selected':''}>${s.site_name}</option>`).join('');
+  return `
+    <div class="modal-title">${u?'Edit User':'Add User'}</div>
+    <div class="modal-field"><label>Phone</label><input id="mUserPhone" value="${u?u.phone:''}" ${u?'readonly class="readonly"':''}></div>
+    <div class="modal-field"><label>Name</label><input id="mUserName" value="${u?u.name:''}"></div>
+    <div class="modal-field"><label>Role</label>
+      <select id="mUserRole">
+        <option value="engineer"${u&&u.role==='engineer'?' selected':''}>Engineer</option>
+        <option value="manager"${u&&u.role==='manager'?' selected':''}>Manager</option>
+        <option value="admin"${u&&u.role==='admin'?' selected':''}>Admin</option>
+      </select>
+    </div>
+    <div class="modal-field"><label>Assigned sites</label>
+      <select id="mUserSites" multiple style="min-height:100px">${siteOpts}</select>
+      <div class="text-hint">Hold Ctrl/Cmd to select multiple</div>
+    </div>
+    ${!u?'<div class="modal-field"><label>Initial password</label><input id="mUserPw" type="text" placeholder="Min 8 chars"></div>':''}
+    <div id="mUserError" class="error-box hidden"></div>
+    <button class="btn btn-primary" onclick="saveUser('${u?u.id:''}')" style="margin-top:8px">Save</button>
+  `;
+}
+
+async function saveUser(id){
+  const phone=document.getElementById('mUserPhone').value.trim();
+  const name=document.getElementById('mUserName').value.trim();
+  const role=document.getElementById('mUserRole').value;
+  const siteSel=document.getElementById('mUserSites');
+  const assignedSites=Array.from(siteSel.selectedOptions).map(o=>o.value);
+  const errEl=document.getElementById('mUserError');
+  errEl.classList.add('hidden');
+
+  if(!phone||!name){errEl.textContent='Phone and name required';errEl.classList.remove('hidden');return;}
+
+  if(id){
+    await sb.from('users').update({name,role,assigned_sites:assignedSites}).eq('id',id);
+  } else {
+    const pwEl=document.getElementById('mUserPw');
+    const pw=pwEl?pwEl.value:'';
+    if(pw.length<8){errEl.textContent='Password min 8 chars';errEl.classList.remove('hidden');return;}
+    const hash=await hashPassword(pw);
+    const{error}=await sb.from('users').insert({phone,name,role,assigned_sites:assignedSites,password_hash:hash,must_change_pw:true});
+    if(error){errEl.textContent=error.message;errEl.classList.remove('hidden');return;}
+  }
+  closeModal();
+  showAdminUsers();
+}
+
+async function handleCSV(e){
+  const file=e.target.files[0];
+  if(!file)return;
+  const text=await file.text();
+  const lines=text.trim().split('\n');
+  const rows=[];
+  for(let i=1;i<lines.length;i++){
+    const cols=lines[i].split(',').map(c=>c.trim());
+    if(cols.length<5)continue;
+    const hash=await hashPassword(cols[4]);
+    rows.push({
+      phone:cols[0],name:cols[1],role:cols[2],
+      assigned_sites:cols[3].split('|').map(s=>s.trim()),
+      password_hash:hash,must_change_pw:true
+    });
+  }
+  if(rows.length>0){
+    await sb.from('users').upsert(rows,{onConflict:'phone'});
+    alert(`Uploaded ${rows.length} users`);
+    showAdminUsers();
+  }
+  e.target.value='';
+}
+
+// ADMIN: SITES
+async function showAdminSites(){
+  const el=document.getElementById('adminContent');
+  el.innerHTML='<div style="text-align:center;color:var(--gray);padding:10px">Loading...</div>';
+  try{
+    const{data}=await sb.from('site_config').select('*').order('site_name');
+    el.innerHTML=`
+      <div style="overflow-x:auto">
+        <table class="admin-table">
+          <thead><tr><th>Site</th><th>DC kW</th><th>AC kW</th><th>Inv</th><th>Lat/Lng</th><th>Actions</th></tr></thead>
+          <tbody>
+            ${(data||[]).map(s=>{
+              const hasCoords=s.latitude&&s.longitude;
+              return `<tr>
+                <td style="font-weight:600">${s.site_name}</td>
+                <td>${s.dc_capacity_kw||'—'}</td>
+                <td>${s.ac_capacity_kw||'—'}</td>
+                <td>${s.inverter_count||'—'}</td>
+                <td>${hasCoords?`${(+s.latitude).toFixed(2)}, ${(+s.longitude).toFixed(2)}`:'<span style="color:var(--red);font-weight:600">Missing</span>'}</td>
+                <td><span style="color:var(--blue);cursor:pointer;font-size:10px" onclick="openSiteModal('${s.id}')">Edit</span></td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  }catch(e){el.innerHTML='<div class="error-box">Failed to load sites</div>';}
+}
+
+function openSiteModal(siteId){
+  sb.from('site_config').select('*').eq('id',siteId).single().then(({data:s})=>{
+    const modal=document.getElementById('modalOverlay');
+    const content=document.getElementById('modalContent');
+    content.innerHTML=`
+      <div class="modal-title">Edit Site</div>
+      <div class="modal-field"><label>Site name</label><input id="mSiteName" value="${s.site_name}" readonly class="readonly"></div>
+      <div class="modal-field"><label>DC capacity (kW)</label><input id="mSiteDC" type="number" value="${s.dc_capacity_kw||''}"></div>
+      <div class="modal-field"><label>AC capacity (kW)</label><input id="mSiteAC" type="number" value="${s.ac_capacity_kw||''}"></div>
+      <div class="modal-field"><label>Inverter count</label><input id="mSiteInv" type="number" value="${s.inverter_count||''}"></div>
+      <div class="modal-field"><label>Strings per inverter (comma-separated)</label>
+        <input id="mSiteStr" value="${s.strings_per_inv?s.strings_per_inv.join(','):''}" placeholder="26,26,25,26,...">
+        <div class="text-hint">One number per inverter, e.g. 26,26,25,26,24,26</div>
+      </div>
+      <div class="modal-field"><label>Latitude</label><input id="mSiteLat" type="number" step="any" value="${s.latitude||''}" placeholder="e.g. 28.6139"></div>
+      <div class="modal-field"><label>Longitude</label><input id="mSiteLng" type="number" step="any" value="${s.longitude||''}" placeholder="e.g. 77.2090"></div>
+      <button class="btn btn-primary" onclick="saveSite('${s.id}')" style="margin-top:8px">Save</button>
+    `;
+    modal.classList.remove('hidden');
+  });
+}
+
+async function saveSite(id){
+  const dc=parseFloat(document.getElementById('mSiteDC').value)||null;
+  const ac=parseFloat(document.getElementById('mSiteAC').value)||null;
+  const inv=parseInt(document.getElementById('mSiteInv').value)||null;
+  const strRaw=document.getElementById('mSiteStr').value.trim();
+  const strs=strRaw?strRaw.split(',').map(s=>parseInt(s.trim())).filter(n=>!isNaN(n)):null;
+  const lat=parseFloat(document.getElementById('mSiteLat').value)||null;
+  const lng=parseFloat(document.getElementById('mSiteLng').value)||null;
+
+  await sb.from('site_config').update({dc_capacity_kw:dc,ac_capacity_kw:ac,inverter_count:inv,strings_per_inv:strs,latitude:lat,longitude:lng}).eq('id',id);
+  closeModal();
+  await loadSites();
+  showAdminSites();
+}
+
+// ADMIN: APPROVALS (reuse approvals logic)
+async function showApprovalInAdmin(){
+  const el=document.getElementById('adminContent');
+  el.innerHTML='<div style="text-align:center;color:var(--gray);padding:10px">Loading...</div>';
+  try{
+    let query=sb.from('dgr_submissions').select('*').order('created_at',{ascending:false}).limit(100);
+    if(approvalFilter!=='all')query=query.eq('status',approvalFilter);
+    const{data}=await query;
+    const filters=['all','pending','approved','rejected'];
+
+    el.innerHTML=`
+      <div class="filter-pills">
+        ${filters.map(f=>`<div class="filter-pill${f===approvalFilter?' active':''}" onclick="approvalFilter='${f}';showApprovalInAdmin()">${f.charAt(0).toUpperCase()+f.slice(1)}</div>`).join('')}
+      </div>
+      ${(!data||data.length===0)?'<div class="card" style="text-align:center;color:var(--gray)">No submissions</div>':
+        data.map(d=>{
+          const dateStr=new Date(d.report_date+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'});
+          return `<div class="approval-card">
+            <div class="approval-header">
+              <div><div class="approval-site">${d.site_name}</div><div class="approval-meta">${dateStr} · ${d.submitted_by_name||''}</div></div>
+              <span class="badge ${d.status==='approved'?'badge-green':d.status==='rejected'?'badge-red':'badge-yellow'}">${d.status}</span>
+            </div>
+            <div class="approval-stats">
+              <span class="approval-stat">${d.total_gen_kwh||0} kWh</span>
+              <span class="approval-stat">PR ${d.pr_pct||0}%</span>
+            </div>
+            ${d.status==='pending'?`<div class="approval-actions">
+              <button class="btn btn-primary" style="flex:1;padding:8px;font-size:11px" onclick="approveAndRefreshAdmin('${d.id}')">Approve</button>
+              <button class="btn" style="flex:1;padding:8px;font-size:11px;background:var(--red-light);color:var(--red);border:1px solid var(--red-border)" onclick="rejectAndRefreshAdmin('${d.id}')">Reject</button>
+            </div>`:''}
+          </div>`;
+        }).join('')}`;
+  }catch(e){el.innerHTML='<div class="error-box">Failed to load</div>';}
+}
+
+async function approveAndRefreshAdmin(id){
+  await sb.from('dgr_submissions').update({status:'approved',reviewed_by:session.name,reviewed_at:new Date().toISOString(),synced_to_sheet:true}).eq('id',id);
+  showApprovalInAdmin();
+}
+async function rejectAndRefreshAdmin(id){
+  const note=prompt('Rejection reason:');
+  if(note===null)return;
+  await sb.from('dgr_submissions').update({status:'rejected',reviewed_by:session.name,review_note:note,reviewed_at:new Date().toISOString()}).eq('id',id);
+  showApprovalInAdmin();
+}
+
+// ADMIN: WEATHER AUDIT
+async function showWeatherAudit(){
+  const el=document.getElementById('adminContent');
+  el.innerHTML=`
+    <div class="card">
+      <div class="card-title">Weather Audit — Manual vs Satellite</div>
+      <div class="grid-2" style="margin-bottom:8px">
+        <div><label>Site</label><select id="waAuditSite"><option value="">Select</option>${sites.map(s=>`<option value="${s.site_name}">${s.site_name}</option>`).join('')}</select></div>
+        <div><label>Date</label><input type="date" id="waAuditDate" value="${new Date().toISOString().split('T')[0]}"></div>
+      </div>
+      <button class="btn btn-primary" style="padding:8px;font-size:11px" onclick="runWeatherAudit()">Compare</button>
+    </div>
+    <div id="waAuditResult"></div>
+  `;
+}
+
+async function runWeatherAudit(){
+  const siteName=document.getElementById('waAuditSite').value;
+  const date=document.getElementById('waAuditDate').value;
+  const resultEl=document.getElementById('waAuditResult');
+  if(!siteName||!date){resultEl.innerHTML='<div class="warning-box">Select site and date</div>';return;}
+
+  resultEl.innerHTML='<div style="text-align:center;color:var(--gray);padding:10px">Loading...</div>';
+
+  try{
+    const{data:sub}=await sb.from('dgr_submissions').select('*').eq('site_name',siteName).eq('report_date',date).single();
+    if(!sub){resultEl.innerHTML='<div class="warning-box">No submission found for this site/date</div>';return;}
+
+    const wa=sub.weather_auto;
+    if(!wa){resultEl.innerHTML='<div class="warning-box">No satellite weather data captured for this submission</div>';return;}
+
+    function delta(manual,satellite){
+      if(!manual||!satellite)return '—';
+      const d=Math.abs(((manual-satellite)/satellite)*100).toFixed(1);
+      return d;
+    }
+    function deltaColor(d){
+      const v=parseFloat(d);
+      if(isNaN(v))return 'badge-gray';
+      if(v<10)return 'badge-green';if(v<20)return 'badge-yellow';return 'badge-red';
+    }
+
+    const radDelta=delta(sub.peak_radiation_wm2,wa.gen_hours_ghi_peak);
+    const poaDelta=delta(sub.poa_kwh_m2,wa.gen_hours_ghi_sum?wa.gen_hours_ghi_sum/1000:null);
+
+    // Hourly GHI bars (from weather_auto we have summary, not hourly — show summary)
+    resultEl.innerHTML=`
+      <div class="card">
+        <div class="card-title">Manual vs Satellite comparison</div>
+        <div class="summary-row">
+          <span class="summary-label">Peak radiation</span>
+          <span class="summary-value">Manual: ${sub.peak_radiation_wm2||'—'} | Satellite: ${wa.gen_hours_ghi_peak||'—'} W/m²
+            <span class="badge ${deltaColor(radDelta)}" style="margin-left:4px">${radDelta}%</span>
+          </span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-label">Weather</span>
+          <span class="summary-value">Manual: ${sub.weather||'—'} | Cloud: ${wa.gen_hours_cloud_pct||'—'}%</span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-label">Temp (max/avg)</span>
+          <span class="summary-value">${wa.gen_hours_temp_max||'—'}°C / ${wa.gen_hours_temp_avg||'—'}°C</span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-label">Effective sun hours</span>
+          <span class="summary-value">${wa.effective_sun_hours||'—'} hrs (GHI>200)</span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-label">Precipitation</span>
+          <span class="summary-value">${wa.precipitation_mm||0} mm</span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-label">Thermal loss</span>
+          <span class="summary-value">${wa.thermal_loss_pct||0}%</span>
+        </div>
+      </div>
+    `;
+  }catch(e){resultEl.innerHTML='<div class="error-box">Error: '+e.message+'</div>';}
+}
+
+// ============================================================
+// MODAL
+// ============================================================
+function closeModal(e){
+  if(e&&e.target!==document.getElementById('modalOverlay'))return;
+  document.getElementById('modalOverlay').classList.add('hidden');
+}
+
+// ============================================================
+// OFFLINE: IndexedDB
+// ============================================================
+function openDB(){
+  return new Promise((resolve,reject)=>{
+    const req=indexedDB.open('dgr_offline_queue',1);
+    req.onupgradeneeded=e=>{e.target.result.createObjectStore('submissions',{keyPath:'id',autoIncrement:true});};
+    req.onsuccess=e=>resolve(e.target.result);
+    req.onerror=e=>reject(e);
+  });
+}
+
+async function saveOffline(payload){
+  const db=await openDB();
+  const tx=db.transaction('submissions','readwrite');
+  tx.objectStore('submissions').add({...payload,_ts:Date.now()});
+  return new Promise(r=>{tx.oncomplete=r;});
+}
+
+async function syncQueue(){
+  try{
+    const db=await openDB();
+    const tx=db.transaction('submissions','readonly');
+    const store=tx.objectStore('submissions');
+    const all=await new Promise(r=>{const req=store.getAll();req.onsuccess=()=>r(req.result);});
+    if(!all||all.length===0)return;
+    for(const item of all){
+      const id=item.id;
+      delete item.id;delete item._ts;
+      const{error}=await sb.from('dgr_submissions').upsert(item,{onConflict:'site_name,report_date'});
+      if(!error){
+        const dtx=db.transaction('submissions','readwrite');
+        dtx.objectStore('submissions').delete(id);
+      }
+    }
+  }catch(e){}
+}
+
+// ============================================================
+// ONLINE/OFFLINE
+// ============================================================
+window.addEventListener('online',()=>{
+  document.getElementById('offlineBanner').classList.remove('show');
+  syncQueue();
+});
+window.addEventListener('offline',()=>{
+  document.getElementById('offlineBanner').classList.add('show');
+});
+
+// ============================================================
+// SERVICE WORKER (inline via blob URL)
+// ============================================================
+if('serviceWorker' in navigator){
+  const swCode=`
+    const CACHE='dgr-v1';
+    const ASSETS=['/dgr_form.html','/dgr_manifest.json'];
+    self.addEventListener('install',e=>{
+      e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)).then(()=>self.skipWaiting()));
+    });
+    self.addEventListener('activate',e=>{
+      e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));
+    });
+    self.addEventListener('fetch',e=>{
+      if(e.request.method!=='GET')return;
+      e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request).then(resp=>{
+        if(resp.status===200){const c=resp.clone();caches.open(CACHE).then(cache=>cache.put(e.request,c));}
+        return resp;
+      }).catch(()=>caches.match('/dgr_form.html'))));
+    });
+  `;
+  const blob=new Blob([swCode],{type:'application/javascript'});
+  const swUrl=URL.createObjectURL(blob);
+  navigator.serviceWorker.register(swUrl).catch(()=>{
+    // Fallback: try external SW
+    navigator.serviceWorker.register('/dgr_sw.js').catch(()=>{});
+  });
+}
+
+// ============================================================
+// INIT
+// ============================================================
+(function init(){
+  // Check session
+  const saved=localStorage.getItem('dgr_session');
+  if(saved){
+    session=JSON.parse(saved);
+    if(session&&session.loggedIn){
+      if(session.must_change_pw){
+        document.getElementById('loginScreen').classList.add('hidden');
+        document.getElementById('pwChangeScreen').classList.remove('hidden');
+      } else {
+        enterApp();
+      }
+      return;
+    }
+  }
+  // Show login
+  document.getElementById('loginScreen').classList.remove('hidden');
+
+  // Check offline
+  if(!navigator.onLine){
+    document.getElementById('offlineBanner').classList.add('show');
+  }
+})();
+</script>
+</body>
+</html>
