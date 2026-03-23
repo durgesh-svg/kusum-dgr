@@ -1676,28 +1676,11 @@ async function saveSite(id){
   const lat=parseFloat(document.getElementById('mSiteLat').value)||null;
   const lng=parseFloat(document.getElementById('mSiteLng').value)||null;
   const errEl=document.getElementById('mSiteError');
-  // Build update payload — only include columns that exist in the table
-  // latitude, longitude, total_modules need to be added in Supabase dashboard
-  const updatePayload={dc_capacity_kw:dc,ac_capacity_kw:ac,inverter_count:inv,strings_per_inv:strs};
-  // Try to save extended fields (silently skip if columns missing)
-  let extError=null;
-  if(lat!==null||lng!==null||mods!==null){
-    const ext={...updatePayload};
-    if(lat!==null)ext.latitude=lat;
-    if(lng!==null)ext.longitude=lng;
-    if(mods!==null)ext.total_modules=mods;
-    const{error:e}=await sb.from('site_config').update(ext).eq('id',id);
-    if(e&&e.message&&e.message.includes('column')){
-      // Extended columns missing — save without them, show info
-      extError='Note: latitude/longitude/total_modules columns not yet added to Supabase. Core data saved.';
-      const{error}=await sb.from('site_config').update(updatePayload).eq('id',id);
-      if(error){errEl.textContent='Save failed: '+error.message;errEl.classList.remove('hidden');return;}
-    } else if(e){errEl.textContent='Save failed: '+e.message;errEl.classList.remove('hidden');return;}
-  } else {
-    const{error}=await sb.from('site_config').update(updatePayload).eq('id',id);
-    if(error){errEl.textContent='Save failed: '+error.message;errEl.classList.remove('hidden');return;}
-  }
-  if(extError){errEl.textContent=extError;errEl.classList.remove('hidden');}
+  const{error}=await sb.from('site_config').update({
+    dc_capacity_kw:dc,ac_capacity_kw:ac,inverter_count:inv,strings_per_inv:strs,
+    latitude:lat,longitude:lng,total_modules:mods
+  }).eq('id',id);
+  if(error){errEl.textContent='Save failed: '+error.message;errEl.classList.remove('hidden');return;}
   closeModal();await loadSites();showAdminSites();
 }
 // ADMIN SETTINGS
