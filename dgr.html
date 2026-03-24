@@ -470,9 +470,12 @@ async function showHomeScreen(){
   });
   const dateStr=new Date().toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
   el.innerHTML=`
-    <div style="padding:4px 0 8px">
-      <div style="font-size:14px;font-weight:700">Daily Generation Report</div>
-      <div style="font-size:10px;color:var(--gray)">Welcome, ${session.name||session.phone}</div>
+    <div class="flex-between" style="padding:4px 0 8px">
+      <div>
+        <div style="font-size:14px;font-weight:700">Daily Generation Report</div>
+        <div style="font-size:10px;color:var(--gray)">Welcome, ${session.name||session.phone}</div>
+      </div>
+      <button class="btn btn-secondary" style="padding:6px 12px;font-size:10px" onclick="logout()">Logout</button>
     </div>
     <div class="stats-grid">
       <div class="stat-card"><div class="stat-num" style="color:var(--green)">${approved}</div><div class="stat-label">Approved</div></div>
