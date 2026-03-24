@@ -440,6 +440,7 @@ function switchTab(tab){
   document.querySelectorAll('#screensWrap > div').forEach(d=>d.classList.add('hidden'));
   document.getElementById('headerBar').classList.add('hidden');
   document.getElementById('navBar').classList.add('hidden');
+  document.getElementById('bottomTabs').classList.remove('hidden');
   if(tab==='dgr')showHomeScreen();
   else if(tab==='history')showHistory();
   else if(tab==='approvals')showApprovals();
@@ -714,7 +715,7 @@ function buildScreen2(){
       <div class="inv-per-str" id="s2ps${i}">${perStr}</div>`;
   }
   const total=formData.inv_gen.reduce((a,b)=>a+(+b||0),0);
-  formData.total_gen_kwh=total;
+  formData.total_gen_kwh=+total.toFixed(2);
   const zeroInvs=formData.inv_gen.map((v,i)=>v===0?i+1:null).filter(v=>v!==null);
 
   // Modules cleaned rows
@@ -762,9 +763,9 @@ function buildScreen2(){
 function onInvGen(idx,val){
   formData.inv_gen[idx]=parseFloat(val)||0;
   const total=formData.inv_gen.reduce((a,b)=>a+(+b||0),0);
-  formData.total_gen_kwh=total;
+  formData.total_gen_kwh=+total.toFixed(2);
   const totalEl=document.getElementById('s2Total');
-  if(totalEl)totalEl.textContent=total.toFixed(1)+' kWh';
+  if(totalEl)totalEl.textContent=(+total.toFixed(2))+' kWh';
   const strs=formData.strings_per_inv||[];
   const s=strs[idx]||0;
   const dc=formData.dc_capacity_kw||0;
