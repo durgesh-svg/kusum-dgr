@@ -1553,6 +1553,7 @@ async function showAdminUsers(){
       <div style="display:flex;gap:6px;margin-bottom:8px">
         <button class="btn btn-primary" style="flex:1;padding:8px;font-size:11px" onclick="openUserModal()">+ Add User</button>
         <button class="btn btn-secondary" style="flex:1;padding:8px;font-size:11px" onclick="document.getElementById('csvInput').click()">Bulk CSV</button>
+        <button class="btn btn-secondary" style="flex:1;padding:8px;font-size:11px" onclick="downloadUserTemplate()">Template</button>
       </div>
       <div style="overflow-x:auto">
         <table class="admin-table">
@@ -1619,6 +1620,25 @@ async function saveUser(id){
     if(error){errEl.textContent=error.message;errEl.classList.remove('hidden');return;}
   }
   closeModal();showAdminUsers();
+}
+function downloadUserTemplate(){
+  const siteList=sites.map(s=>s.site_name).join(' | ');
+  const rows=[
+    'phone,name,role,assigned_sites,password',
+    '9876543210,Ramesh Kumar,engineer,Bidasar|Badsar,Welcome@123',
+    '9876543211,Priya Sharma,manager,ALL,Welcome@123',
+    '# Role options: engineer / manager / admin',
+    '# assigned_sites: pipe-separated site names (e.g. Bidasar|Badsar) or ALL for all sites',
+    '# password: min 8 chars — user will be asked to change on first login',
+    '#',
+    '# Available sites:',
+    ...sites.map(s=>`# ${s.site_name}`)
+  ];
+  const blob=new Blob([rows.join('\n')],{type:'text/csv'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='dgr_users_template.csv';
+  a.click();
 }
 async function handleCSV(e){
   const file=e.target.files[0];if(!file)return;
