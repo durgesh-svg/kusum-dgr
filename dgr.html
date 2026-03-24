@@ -303,6 +303,7 @@ label{display:block;font-size:10px;color:var(--text-muted);font-weight:500;margi
 </div>
 <input type="file" id="photoInput" accept="image/*" capture="environment" class="hidden" onchange="handlePhoto(event)">
 <input type="file" id="csvInput" accept=".csv" class="hidden" onchange="handleCSV(event)">
+<input type="file" id="siteCsvInput" accept=".csv" class="hidden" onchange="handleSiteBulkCSV(event)">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 // CONFIG
@@ -1424,34 +1425,65 @@ Submitted by :- ${formData.submitted_by_name}`;
 function shareWhatsApp(){window.open('https://wa.me/?text='+encodeURIComponent(buildWhatsAppMsg()),'_blank');}
 function escHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 // HISTORY
-async function showHistory(){
+let historyFilters={site:'',date:''};
+function showHistory(){
   const el=document.getElementById('screenHistory');
   el.classList.remove('hidden');
-  el.innerHTML='<div class="card-title">Submission History</div><div style="text-align:center;color:var(--gray);padding:20px">Loading...</div>';
+  // Build available site list for dropdown
+  let siteOptions='<option value="">All sites</option>';
+  const siteList=session.role==='engineer'
+    ?(session.assigned_sites||[])
+    :sites.map(s=>s.site_name);
+  siteList.forEach(s=>{siteOptions+=`<option value="${s}"${historyFilters.site===s?' selected':''}>${s}</option>`;});
+  el.innerHTML=`
+    <div class="card-title">Submission History</div>
+    <div class="card" style="padding:10px;margin-bottom:8px">
+      <div style="display:flex;gap:6px;margin-bottom:8px">
+        <div style="flex:1">
+          <label style="font-size:10px;color:var(--gray);display:block;margin-bottom:2px">Site</label>
+          <select id="histSiteFilter" style="width:100%;padding:7px 6px;font-size:12px;border:1px solid var(--border);border-radius:6px;background:#fff" onchange="historyFilters.site=this.value">
+            ${siteOptions}
+          </select>
+        </div>
+        <div style="flex:1">
+          <label style="font-size:10px;color:var(--gray);display:block;margin-bottom:2px">Date</label>
+          <input type="date" id="histDateFilter" value="${historyFilters.date}" style="width:100%;padding:6px;font-size:12px;border:1px solid var(--border);border-radius:6px;box-sizing:border-box" onchange="historyFilters.date=this.value">
+        </div>
+      </div>
+      <button class="btn btn-primary" style="width:100%;padding:8px;font-size:12px" onclick="loadHistory()">Search</button>
+    </div>
+    <div id="historyResults"><div style="text-align:center;color:var(--gray);padding:20px">Press Search to load results</div></div>`;
+  loadHistory();
+}
+async function loadHistory(){
+  const el=document.getElementById('historyResults');
+  if(!el)return;
+  el.innerHTML='<div style="text-align:center;color:var(--gray);padding:20px">Loading...</div>';
   try{
-    let query=sb.from('dgr_submissions').select('*').order('report_date',{ascending:false}).limit(50);
+    let query=sb.from('dgr_submissions').select('*').order('report_date',{ascending:false}).limit(100);
     if(session.role==='engineer')query=query.eq('submitted_by_phone',session.phone);
+    if(historyFilters.site)query=query.eq('site_name',historyFilters.site);
+    if(historyFilters.date)query=query.eq('report_date',historyFilters.date);
     const{data}=await query;
-    if(!data||data.length===0){el.innerHTML='<div class="card-title">Submission History</div><div class="card" style="text-align:center;color:var(--gray)">No submissions yet</div>';return;}
-    el.innerHTML=`<div class="card-title">Submission History</div>
-      ${data.map(d=>{
-        const dateStr=new Date(d.report_date+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
-        const statusCls=d.status==='approved'?'badge-green':d.status==='rejected'?'badge-red':'badge-yellow';
-        return `<div class="history-card">
-          <div class="flex-between">
-            <div><div class="history-site">${d.site_name}</div><div class="history-date">${dateStr} · ${d.submitted_by_name||''}</div></div>
-            <span class="badge ${statusCls}">${d.status}</span>
-          </div>
-          <div class="history-stats">
-            <span class="badge badge-gray">${d.total_gen_kwh||0} kWh</span>
-            <span class="badge badge-gray">PR ${d.pr_pct||0}%</span>
-            ${d.grid_outage?'<span class="badge badge-yellow">Grid outage</span>':''}
-          </div>
-          <div style="margin-top:6px">
-            <button class="btn btn-secondary" style="width:100%;padding:6px;font-size:10px" onclick="viewSubmission('${d.id}')">View full summary</button>
-          </div>
-        </div>`;
-      }).join('')}`;
+    if(!data||data.length===0){el.innerHTML='<div class="card" style="text-align:center;color:var(--gray)">No submissions found</div>';return;}
+    el.innerHTML=data.map(d=>{
+      const dateStr=new Date(d.report_date+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
+      const statusCls=d.status==='approved'?'badge-green':d.status==='rejected'?'badge-red':'badge-yellow';
+      return `<div class="history-card">
+        <div class="flex-between">
+          <div><div class="history-site">${d.site_name}</div><div class="history-date">${dateStr} · ${d.submitted_by_name||''}</div></div>
+          <span class="badge ${statusCls}">${d.status}</span>
+        </div>
+        <div class="history-stats">
+          <span class="badge badge-gray">${d.total_gen_kwh||0} kWh</span>
+          <span class="badge badge-gray">PR ${d.pr_pct||0}%</span>
+          ${d.grid_outage?'<span class="badge badge-yellow">Grid outage</span>':''}
+        </div>
+        <div style="margin-top:6px">
+          <button class="btn btn-secondary" style="width:100%;padding:6px;font-size:10px" onclick="viewSubmission('${d.id}')">View full summary</button>
+        </div>
+      </div>`;
+    }).join('');
   }catch(e){el.innerHTML='<div class="error-box">Failed to load history</div>';}
 }
 
@@ -1661,6 +1693,10 @@ async function showAdminSites(){
   try{
     const{data}=await sb.from('site_config').select('*').order('site_name');
     el.innerHTML=`
+      <div style="display:flex;gap:6px;margin-bottom:8px">
+        <button class="btn btn-secondary" style="flex:1;padding:8px;font-size:11px" onclick="document.getElementById('siteCsvInput').click()">Bulk CSV</button>
+        <button class="btn btn-secondary" style="flex:1;padding:8px;font-size:11px" onclick="downloadSiteTemplate()">Template</button>
+      </div>
       <div style="overflow-x:auto">
         <table class="admin-table">
           <thead><tr><th>Site</th><th>DC kW</th><th>AC kW</th><th>Inv</th><th>Lat/Lng</th><th></th></tr></thead>
@@ -1677,6 +1713,60 @@ async function showAdminSites(){
         </table>
       </div>`;
   }catch(e){el.innerHTML='<div class="error-box">Failed to load sites</div>';}
+}
+function downloadSiteTemplate(){
+  const rows=[['site_name','dc_capacity_kw','ac_capacity_kw','inverter_count','strings_per_inv','total_modules','latitude','longitude']];
+  (sites||[]).forEach(s=>{
+    rows.push([
+      s.site_name,
+      s.dc_capacity_kw||'',
+      s.ac_capacity_kw||'',
+      s.inverter_count||'',
+      s.strings_per_inv?(Array.isArray(s.strings_per_inv)?s.strings_per_inv.join(';'):s.strings_per_inv):'',
+      s.total_modules||'',
+      s.latitude||'',
+      s.longitude||''
+    ]);
+  });
+  // If no sites loaded yet, add example rows
+  if(rows.length===1){
+    rows.push(['Example Site','2000','1800','10','26;26;25;25;26;26;25;25;26;26','3500','28.6139','77.2090']);
+  }
+  const csv=rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const a=document.createElement('a');
+  a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
+  a.download='sites_template.csv';
+  a.click();
+}
+async function handleSiteBulkCSV(e){
+  const file=e.target.files[0];
+  if(!file)return;
+  const text=await file.text();
+  const lines=text.trim().split('\n');
+  const headers=lines[0].split(',').map(h=>h.trim().replace(/^"|"$/g,'').toLowerCase());
+  const rows=lines.slice(1);
+  let updated=0,errors=[];
+  for(const row of rows){
+    if(!row.trim())continue;
+    const cols=row.match(/("(?:[^"]|"")*"|[^,]*)/g).map(v=>v.trim().replace(/^"|"$/g,'').replace(/""/g,'"'));
+    const obj={};headers.forEach((h,i)=>{obj[h]=cols[i]||'';});
+    if(!obj.site_name)continue;
+    const update={};
+    if(obj.dc_capacity_kw!=='')update.dc_capacity_kw=parseFloat(obj.dc_capacity_kw)||null;
+    if(obj.ac_capacity_kw!=='')update.ac_capacity_kw=parseFloat(obj.ac_capacity_kw)||null;
+    if(obj.inverter_count!=='')update.inverter_count=parseInt(obj.inverter_count)||null;
+    if(obj.strings_per_inv!=='')update.strings_per_inv=obj.strings_per_inv.split(';').map(s=>parseInt(s.trim())).filter(n=>!isNaN(n));
+    if(obj.total_modules!=='')update.total_modules=parseInt(obj.total_modules)||null;
+    if(obj.latitude!=='')update.latitude=parseFloat(obj.latitude)||null;
+    if(obj.longitude!=='')update.longitude=parseFloat(obj.longitude)||null;
+    if(!Object.keys(update).length)continue;
+    const{error}=await sb.from('site_config').update(update).eq('site_name',obj.site_name);
+    if(error)errors.push(obj.site_name+': '+error.message);
+    else updated++;
+  }
+  e.target.value='';
+  alert(updated+' site(s) updated.'+(errors.length?'\n\nErrors:\n'+errors.join('\n'):''));
+  await loadSites();showAdminSites();
 }
 function openSiteModal(siteId){
   sb.from('site_config').select('*').eq('id',siteId).single().then(({data:s})=>{
