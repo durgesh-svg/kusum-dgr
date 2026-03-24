@@ -1277,23 +1277,6 @@ async function submitReport(){
         }
       }catch(e){}
     }
-    // Extended fields stored in remarks until new columns are added to Supabase
-    const extrasNote=[
-      formData.wti_c?`WTI:${formData.wti_c}°C(${formData.wti_peak_time||'—'})`:'',
-      formData.oti_c?`OTI:${formData.oti_c}°C(${formData.oti_peak_time||'—'})`:'',
-      formData.mog_level?`MOG:${formData.mog_level}`:'',
-      formData.silica_gel?`Silica:${formData.silica_gel}`:'',
-      formData.rain?`Rain:${formData.rain_intensity||'Yes'}${formData.rain_modules_cleaned?'(cleaned)':''}`:'',
-      formData.weather_avg_ambient_c?`AvgAmb:${formData.weather_avg_ambient_c}°C`:'',
-      formData.weather_max_ambient_c?`MaxAmb:${formData.weather_max_ambient_c}°C`:'',
-      formData.weather_avg_module_c?`AvgMod:${formData.weather_avg_module_c}°C`:'',
-      formData.weather_max_module_c?`MaxMod:${formData.weather_max_module_c}°C`:'',
-      formData.modules_cleaned_today?`ModsCleaned:${formData.modules_cleaned_today}/${formData.modules_total||'?'}`:'',
-      formData.daily_activity?`Activity:${formData.daily_activity}`:'',
-      formData.plant_outage&&formData.plant_outage_details.length>0?`PlantOutage:${JSON.stringify(formData.plant_outage_details)}`:'',
-    ].filter(Boolean).join(' | ');
-    const fullRemarks=[formData.remarks,extrasNote].filter(Boolean).join('\n---\n');
-
     const payload={
       site_name:formData.site_name,
       report_date:formData.report_date,
@@ -1303,6 +1286,7 @@ async function submitReport(){
       ac_capacity_kw:formData.ac_capacity_kw,
       inv_gen:formData.inv_gen,
       inv_strings:formData.strings_per_inv,
+      inv_modules_cleaned:formData.inv_modules_cleaned,
       total_gen_kwh:formData.total_gen_kwh,
       peak_radiation_wm2:formData.peak_radiation_wm2,
       poa_kwh_m2:formData.poa_kwh_m2,
@@ -1312,18 +1296,28 @@ async function submitReport(){
       pr_pct:formData.pr_pct,
       grid_outage:formData.grid_outage,
       grid_outage_details:formData.grid_outage_details.length>0?formData.grid_outage_details:null,
-      plant_breakdown:formData.plant_outage,
-      plant_breakdown_text:formData.plant_outage_details.length>0?JSON.stringify(formData.plant_outage_details):null,
-      wti_hv_c:formData.wti_c,      // reusing old col for WTI reading
-      wti_lv_c:formData.oti_c,      // reusing old col for OTI reading
-      wti_max_c:formData.wti_c,
-      oil_level_pct:formData.mog_level?MOG_OPTIONS.indexOf(formData.mog_level)*14:null,
+      plant_outage:formData.plant_outage,
+      plant_outage_details:formData.plant_outage_details.length>0?formData.plant_outage_details:null,
+      wti_c:formData.wti_c, wti_peak_time:formData.wti_peak_time||null,
+      oti_c:formData.oti_c, oti_peak_time:formData.oti_peak_time||null,
+      mog_level:formData.mog_level||null,
+      silica_gel:formData.silica_gel||null,
       cleaning_c1_status:formData.cleaning_c1_status,cleaning_c1_tds:formData.cleaning_c1_tds,
       cleaning_c2_status:formData.cleaning_c2_status,cleaning_c2_tds:formData.cleaning_c2_tds,
       cleaning_c3_status:formData.cleaning_c3_status,cleaning_c3_tds:formData.cleaning_c3_tds,
+      modules_cleaned_today:formData.modules_cleaned_today,
+      modules_total:formData.modules_total,
       weather:formData.weather,
-      remarks:fullRemarks,
+      rain:formData.rain, rain_intensity:formData.rain_intensity||null,
+      rain_modules_cleaned:formData.rain_modules_cleaned,
+      weather_avg_ambient_c:formData.weather_avg_ambient_c,
+      weather_max_ambient_c:formData.weather_max_ambient_c,
+      weather_avg_module_c:formData.weather_avg_module_c,
+      weather_max_module_c:formData.weather_max_module_c,
+      daily_activity:formData.daily_activity||null,
+      remarks:formData.remarks,
       image_urls:uploadedUrls,
+      weather_auto:formData.weather_auto||null,
       status:'pending'
     };
     if(navigator.onLine){
