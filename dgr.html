@@ -1444,6 +1444,9 @@ async function showHistory(){
             <span class="badge badge-gray">PR ${d.pr_pct||0}%</span>
             ${d.grid_outage?'<span class="badge badge-yellow">Grid outage</span>':''}
           </div>
+          <div style="margin-top:6px">
+            <button class="btn btn-secondary" style="width:100%;padding:6px;font-size:10px" onclick="viewSubmission('${d.id}')">View full summary</button>
+          </div>
         </div>`;
       }).join('')}`;
   }catch(e){el.innerHTML='<div class="error-box">Failed to load history</div>';}
@@ -1486,10 +1489,12 @@ async function renderApprovals(el,inAdmin){
               <span class="approval-stat">PR ${d.pr_pct||0}%</span>
               ${flags.join('')}
             </div>
-            ${d.status==='pending'?`<div class="approval-actions">
+            <div class="approval-actions">
+              <button class="btn btn-secondary" style="flex:1;padding:8px;font-size:11px" onclick="viewSubmission('${d.id}')">View</button>
+              ${d.status==='pending'?`
               <button class="btn btn-primary" style="flex:1;padding:8px;font-size:11px" onclick="${approveF}('${d.id}')">Approve</button>
-              <button class="btn" style="flex:1;padding:8px;font-size:11px;background:var(--red-light);color:var(--red);border:1px solid var(--red-border)" onclick="${rejectF}('${d.id}')">Reject</button>
-            </div>`:''}
+              <button class="btn" style="flex:1;padding:8px;font-size:11px;background:var(--red-light);color:var(--red);border:1px solid var(--red-border)" onclick="${rejectF}('${d.id}')">Reject</button>`:''}
+            </div>
           </div>`;
         }).join('')}`;
   }catch(e){el.innerHTML='<div class="error-box">Failed to load</div>';}
@@ -1798,6 +1803,74 @@ async function runWeatherAudit(){
           <span class="summary-value">${wa.precipitation_mm||0} mm</span></div>
       </div>`;
   }catch(e){resultEl.innerHTML='<div class="error-box">Error: '+e.message+'</div>';}
+}
+
+// VIEW SUBMISSION SUMMARY
+async function viewSubmission(id){
+  const modal=document.getElementById('modalOverlay');
+  const content=document.getElementById('modalContent');
+  content.innerHTML=`<div class="modal-header"><div class="modal-title">Loading...</div><button class="modal-close" onclick="closeModal()">✕</button></div>`;
+  modal.classList.remove('hidden');
+  const{data:d,error}=await sb.from('dgr_submissions').select('*').eq('id',id).single();
+  if(error||!d){content.innerHTML=`<div class="modal-header"><div class="modal-title">Error</div><button class="modal-close" onclick="closeModal()">✕</button></div><div class="error-box">Could not load submission</div>`;return;}
+  const dateStr=new Date(d.report_date+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
+  const inv=d.inv_gen||[];
+  const strs=d.inv_strings||[];
+  let invRows='';
+  for(let i=0;i<inv.length;i++){
+    const s=strs[i]||0;
+    const dc=d.dc_capacity_kw&&inv.length?d.dc_capacity_kw/inv.length:0;
+    const sy=dc>0?(inv[i]/dc).toFixed(2):'—';
+    const ps=s>0?(inv[i]/s).toFixed(1):'—';
+    invRows+=`<tr><td style="color:var(--blue);font-weight:700">INV${i+1}</td><td>${inv[i]}</td><td>${sy}</td><td>${ps}</td></tr>`;
+  }
+  const gridDetails=(d.grid_outage_details||[]).map(o=>`${o.from||'?'}–${o.to||'?'} · ${o.reason||''}`).join('<br>');
+  const plantDetails=(d.plant_outage_details||[]).map(o=>`${o.from||'?'}–${o.to||'?'} · ${o.fault_code||''} ${o.sub_fault?'('+o.sub_fault+')':''}`).join('<br>');
+  const statusCls=d.status==='approved'?'badge-green':d.status==='rejected'?'badge-red':'badge-yellow';
+
+  function row(label,val){return `<div class="summary-row"><span class="summary-label">${label}</span><span class="summary-value">${val}</span></div>`;}
+
+  content.innerHTML=`
+    <div class="modal-header">
+      <div>
+        <div class="modal-title">${d.site_name}</div>
+        <div style="font-size:10px;color:var(--gray)">${dateStr} · ${d.submitted_by_name||''} · <span class="badge ${statusCls}">${d.status}</span></div>
+      </div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin:8px 0 4px">Generation</div>
+    <table class="admin-table" style="margin-bottom:8px">
+      <thead><tr><th>#</th><th>kWh</th><th>kWh/kWp</th><th>kWh/str</th></tr></thead>
+      <tbody>${invRows}</tbody>
+    </table>
+    ${row('Total generation','<strong>'+( d.total_gen_kwh||0)+' kWh</strong>')}
+    ${row('DC CUF / AC CUF',`${d.dc_cuf_pct||0}% / ${d.ac_cuf_pct||0}%`)}
+    ${row('PR',`<strong>${d.pr_pct||0}%</strong>`)}
+    ${row('Peak radiation',`${d.peak_radiation_wm2||'—'} W/m²`)}
+    ${row('POA',`${d.poa_kwh_m2||'—'} kWh/m²`)}
+    ${row('Peak power',`${d.peak_power_kwh||'—'} kWh`)}
+    <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin:10px 0 4px">Outages</div>
+    ${row('Grid outage',d.grid_outage?`<span class="badge badge-yellow">Yes</span><br><span style="font-size:10px">${gridDetails}</span>`:'<span class="badge badge-green">No</span>')}
+    ${row('Plant outage',d.plant_outage?`<span class="badge badge-red">Yes</span><br><span style="font-size:10px">${plantDetails}</span>`:'<span class="badge badge-green">No</span>')}
+    <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin:10px 0 4px">Transformer</div>
+    ${row('WTI',`${d.wti_c||'—'}°C ${d.wti_peak_time?'at '+d.wti_peak_time:''}`)}
+    ${row('OTI',`${d.oti_c||'—'}°C ${d.oti_peak_time?'at '+d.oti_peak_time:''}`)}
+    ${row('MOG level',d.mog_level||'—')}
+    ${row('Silica gel',d.silica_gel||'—')}
+    <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin:10px 0 4px">Weather & Temps</div>
+    ${row('Condition',d.weather||'—')}
+    ${row('Rain',d.rain?(d.rain_intensity||'Yes')+(d.rain_modules_cleaned?' · Modules cleaned':''):'No')}
+    ${row('Ambient temp',`Avg ${d.weather_avg_ambient_c||'—'}°C / Max ${d.weather_max_ambient_c||'—'}°C`)}
+    ${row('Module temp',`Avg ${d.weather_avg_module_c||'—'}°C / Max ${d.weather_max_module_c||'—'}°C`)}
+    <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin:10px 0 4px">Cleaning</div>
+    ${row('Cycle status',`C1: ${d.cleaning_c1_status||'—'} · C2: ${d.cleaning_c2_status||'—'} · C3: ${d.cleaning_c3_status||'—'}`)}
+    ${row('Modules cleaned',d.modules_cleaned_today!=null?`${d.modules_cleaned_today} / ${d.modules_total||'—'}`:'—')}
+    <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin:10px 0 4px">Activity & Remarks</div>
+    ${row('Today\'s activity',d.daily_activity||'—')}
+    ${row('Remarks',d.remarks||'—')}
+    ${d.status==='rejected'&&d.review_note?row('Rejection reason',`<span style="color:var(--red)">${d.review_note}</span>`):''}
+    ${d.reviewed_by?row('Reviewed by',d.reviewed_by):''}
+  `;
 }
 
 // MODAL
