@@ -1386,8 +1386,8 @@ async function submitReport(){
       submitted_by_name:formData.submitted_by_name,
       dc_capacity_kw:formData.dc_capacity_kw,
       ac_capacity_kw:formData.ac_capacity_kw,
-      inv_gen:formData.inv_gen,
-      inv_strings:formData.strings_per_inv,
+      inv_gen:formData.inv_gen||[],
+      inv_strings:formData.strings_per_inv||[],
       inv_modules_cleaned:formData.inv_modules_cleaned,
       total_gen_kwh:formData.total_gen_kwh,
       peak_radiation_wm2:formData.peak_radiation_wm2,
@@ -1418,16 +1418,18 @@ async function submitReport(){
       weather_max_module_c:formData.weather_max_module_c,
       daily_activity:formData.daily_activity||null,
       remarks:formData.remarks,
-      image_urls:uploadedUrls,
+      image_urls:Object.keys(uploadedUrls).length>0?uploadedUrls:null,
       weather_auto:formData.weather_auto||null,
       status:'pending'
     };
+    // Remove undefined values
+    Object.keys(payload).forEach(k=>{if(payload[k]===undefined)payload[k]=null;});
     if(navigator.onLine){
       const{error}=await sb.from('dgr_submissions').upsert(payload,{onConflict:'site_name,report_date'});
       if(error){
-        // Show DB error to user instead of silently failing
         btn.disabled=false;btn.textContent='Submit Report';
-        alert('Submit failed: '+error.message+'\n\nPlease add missing columns in Supabase or contact admin.');
+        const detail=[error.message,error.details,error.hint].filter(Boolean).join(' | ');
+        alert('Submit failed: '+detail+'\n\nContact admin if issue persists.');
         return;
       }
     } else await saveOffline(payload);
