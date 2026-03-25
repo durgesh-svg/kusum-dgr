@@ -3,25 +3,34 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<meta name="theme-color" content="#16a34a">
+<meta name="theme-color" content="#7e5700">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <title>PM KUSUM DGR</title>
 <link rel="manifest" href="/dgr_manifest.json">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
+  /* Solar Yellow primary */
+  --primary:#7e5700;--primary-cont:#ffc050;--primary-dim:#ffba38;
+  /* Surfaces */
+  --surf:#fcf9f8;--surf-low:#f6f3f2;--surf-mid:#f0eded;--surf-high:#eae7e7;
+  --on-surf:#1b1c1c;--on-surf-var:#4f4632;--outline-var:#d4c5ab;
+  /* Semantic colours (kept for compatibility) */
   --green:#16a34a;--green-light:#f0fdf4;--green-border:#bbf7d0;--green-dark:#15803d;
   --amber:#a16207;--amber-light:#fef9c3;--amber-border:#fde047;
   --red:#b91c1c;--red-light:#fee2e2;--red-border:#fca5a5;
   --blue:#1d4ed8;--blue-light:#dbeafe;
   --gray:#6b7280;--gray-light:#f3f4f6;
   --border:#e5e7eb;--text:#111827;--text-muted:#9ca3af;
-  --bg:#f4f6f9;--card-bg:#ffffff;
+  --bg:#f6f3f2;--card-bg:#ffffff;
   --orange:#f97316;--orange-light:#fff7ed;--orange-border:#fed7aa;
 }
+.material-symbols-outlined{font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 24;vertical-align:middle}
 html{font-size:16px;-webkit-text-size-adjust:100%}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+body{font-family:'Public Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   background:var(--bg);color:var(--text);min-height:100dvh;overflow-x:hidden;font-size:12px}
 .hidden{display:none!important}
 .card{background:var(--card-bg);border:1px solid var(--border);border-radius:10px;padding:11px 13px;margin-bottom:8px}
@@ -39,7 +48,7 @@ label{display:block;font-size:10px;color:var(--text-muted);font-weight:500;margi
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px;
   border-radius:8px;font-size:12px;font-weight:600;border:none;cursor:pointer;
   transition:all .15s;-webkit-tap-highlight-color:transparent;font-family:inherit}
-.btn-primary{background:var(--green);color:#fff;width:100%}
+.btn-primary{background:var(--primary);color:#fff;width:100%}
 .btn-primary:active{opacity:.85}
 .btn-primary:disabled{opacity:.45;cursor:not-allowed}
 .btn-secondary{background:var(--gray-light);color:#374151;border:1px solid var(--border)}
@@ -52,9 +61,9 @@ label{display:block;font-size:10px;color:var(--text-muted);font-weight:500;margi
 .badge-blue{background:var(--blue-light);color:var(--blue)}
 .badge-gray{background:#f1f5f9;color:#64748b}
 .progress-dots{display:flex;gap:4px;margin-top:6px}
-.progress-dot{height:3px;border-radius:2px;flex:1;background:var(--border)}
-.progress-dot.done{background:#86efac}
-.progress-dot.active{background:var(--green)}
+.progress-dot{height:3px;border-radius:2px;flex:1;background:rgba(255,255,255,.25)}
+.progress-dot.done{background:rgba(255,255,255,.55)}
+.progress-dot.active{background:#fff}
 .toggle{width:40px;height:22px;background:#d1d5db;border-radius:11px;position:relative;cursor:pointer;transition:background .2s;flex-shrink:0}
 .toggle::after{content:'';position:absolute;width:16px;height:16px;background:#fff;border-radius:50%;top:3px;left:3px;
   transition:left .2s;box-shadow:0 1px 2px rgba(0,0,0,.15)}
@@ -78,16 +87,16 @@ label{display:block;font-size:10px;color:var(--text-muted);font-weight:500;margi
   font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px;justify-content:center;
   border:none;cursor:pointer;font-family:inherit}
 .btn-whatsapp:active{opacity:.85}
-.header-bar{background:#fff;padding:10px 14px;border-bottom:1px solid #f0f0f0;position:sticky;top:0;z-index:50}
-.header-title{font-size:13px;font-weight:700;color:var(--text)}
-.header-sub{font-size:10px;color:var(--gray)}
+.header-bar{background:var(--primary);padding:10px 14px 8px;position:sticky;top:0;z-index:50}
+.header-title{font-size:14px;font-weight:700;color:#fff;font-family:'Space Grotesk',sans-serif}
+.header-sub{font-size:10px;color:rgba(255,255,255,.7)}
 .nav-bar{background:#fff;border-top:1px solid #f0f0f0;padding:9px 14px 13px;display:flex;gap:7px;
   position:sticky;bottom:0;z-index:50}
 .bottom-tabs{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid #f0f0f0;
   display:flex;z-index:100;padding:6px 0 env(safe-area-inset-bottom,6px)}
 .bottom-tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 0;
   font-size:9px;font-weight:500;color:var(--gray);cursor:pointer;-webkit-tap-highlight-color:transparent}
-.bottom-tab.active{color:var(--green)}
+.bottom-tab.active{color:var(--primary)}
 .bottom-tab svg{width:20px;height:20px}
 .screen{background:var(--bg);padding:12px 14px;min-height:calc(100dvh - 100px);display:flex;flex-direction:column;gap:8px}
 .screen-padded{padding-bottom:70px}
@@ -155,7 +164,7 @@ label{display:block;font-size:10px;color:var(--text-muted);font-weight:500;margi
 .site-action{font-size:10px;color:var(--green);font-weight:600;white-space:nowrap}
 .stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px}
 .stat-card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:10px;text-align:center}
-.stat-num{font-size:16px;font-weight:700}
+.stat-num{font-size:18px;font-weight:700;font-family:'Space Grotesk',sans-serif}
 .stat-label{font-size:9px;color:var(--text-muted);margin-top:2px}
 .admin-table{width:100%;border-collapse:collapse;font-size:11px}
 .admin-table th{background:var(--gray-light);padding:6px 8px;text-align:left;font-weight:600;font-size:10px;
@@ -187,11 +196,11 @@ label{display:block;font-size:10px;color:var(--text-muted);font-weight:500;margi
 .admin-tab{flex:1;padding:8px 4px;text-align:center;font-size:10px;font-weight:600;cursor:pointer;
   color:var(--gray);border-right:1px solid var(--border);min-width:0}
 .admin-tab:last-child{border-right:none}
-.admin-tab.active{background:var(--green);color:#fff}
+.admin-tab.active{background:var(--primary);color:#fff}
 .filter-pills{display:flex;gap:4px;margin-bottom:8px}
 .filter-pill{padding:4px 10px;border-radius:12px;font-size:10px;font-weight:600;cursor:pointer;
   border:1px solid var(--border);background:#fff;color:var(--gray)}
-.filter-pill.active{background:var(--green);color:#fff;border-color:var(--green)}
+.filter-pill.active{background:var(--primary);color:#fff;border-color:var(--primary)}
 /* Outage */
 .outage-block{background:#f9fafb;border:1px solid var(--border);border-radius:7px;padding:8px 10px;margin-bottom:6px}
 .outage-mins{font-size:10px;color:var(--blue);font-weight:600;padding:3px 8px;background:var(--blue-light);border-radius:6px}
@@ -224,6 +233,64 @@ label{display:block;font-size:10px;color:var(--text-muted);font-weight:500;margi
 /* Settings list */
 .settings-item{display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--gray-light)}
 .settings-item-text{font-size:11px;color:var(--text)}
+/* ── HOME HEADER ── */
+.home-header{background:var(--primary);padding:14px 14px 16px;color:#fff}
+.home-header-brand{font-size:11px;font-weight:600;opacity:.75;letter-spacing:.04em;margin-bottom:2px}
+.home-header-title{font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:700;letter-spacing:-.01em}
+.home-header-row{display:flex;justify-content:space-between;align-items:flex-start}
+.home-logout{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);color:#fff;font-size:10px;font-family:inherit;padding:5px 12px;border-radius:99px;cursor:pointer}
+/* ── PROGRESS CARD ── */
+.home-progress{background:var(--card-bg);border-radius:10px;padding:13px 14px;margin:12px 14px 0}
+.home-progress-top{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:8px}
+.home-progress-num{font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:700;color:var(--on-surf);line-height:1}
+.home-progress-num span{font-size:13px;font-weight:500;color:var(--gray)}
+.home-progress-pct{font-size:11px;color:var(--gray)}
+.home-progress-bar{height:7px;background:var(--surf-high);border-radius:99px;overflow:hidden;margin-bottom:8px}
+.home-progress-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--primary),var(--primary-dim))}
+.home-progress-chips{display:flex;gap:6px;flex-wrap:wrap}
+.hpchip{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:600;padding:3px 8px;border-radius:99px}
+.hpchip-green{background:#dcfce7;color:#15803d}
+.hpchip-amber{background:#fef9c3;color:#a16207}
+.hpchip-gray{background:var(--surf-high);color:var(--gray)}
+/* ── SITE CARDS (redesigned) ── */
+.site-card-new{display:flex;align-items:center;gap:10px;padding:10px 12px;
+  background:var(--card-bg);border-radius:10px;margin-bottom:6px;cursor:pointer;
+  -webkit-tap-highlight-color:transparent;transition:background .1s}
+.site-card-new:active{background:var(--surf-high)}
+.site-icon{width:38px;height:38px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:20px}
+.site-icon-ok{background:#dcfce7}
+.site-icon-pending{background:#fef9c3}
+.site-icon-todo{background:var(--surf-high)}
+.site-card-info{flex:1;min-width:0}
+.site-card-name{font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.site-card-cap{font-size:10px;color:var(--gray);margin-top:1px}
+/* ── YES/NO PILL BUTTONS ── */
+.yn-group{display:flex;gap:6px;margin-top:8px}
+.yn-btn{flex:1;padding:12px;border:none;border-radius:8px;font-size:13px;font-weight:700;font-family:'Space Grotesk',sans-serif;cursor:pointer;transition:all .15s;letter-spacing:.02em;-webkit-tap-highlight-color:transparent}
+.yn-btn-yes{background:var(--surf-high);color:var(--gray)}
+.yn-btn-yes.yn-active{background:#dcfce7;color:#15803d}
+.yn-btn-no{background:var(--surf-high);color:var(--gray)}
+.yn-btn-no.yn-active{background:#fee2e2;color:#b91c1c}
+/* ── EQUIPMENT CARDS ── */
+.equip-card-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.equip-card{background:var(--surf-low);border-radius:8px;padding:10px 12px}
+.equip-card-label{font-size:10px;font-weight:600;color:var(--on-surf-var);text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px}
+.equip-card input{background:var(--surf-high);border:none;border-radius:6px;padding:9px 8px;font-size:16px;font-family:'Space Grotesk',sans-serif;font-weight:700;color:var(--on-surf);width:100%;text-align:center;outline:none}
+.equip-card input:focus{background:#dbeafe;outline:2px solid var(--blue)}
+.equip-card-unit{font-size:10px;color:var(--gray);text-align:center;margin-top:3px}
+/* ── MOG TAP GRID ── */
+.mog-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px}
+.mog-opt{padding:9px 4px;background:var(--surf-high);border-radius:7px;text-align:center;font-size:11px;font-weight:600;color:var(--on-surf-var);cursor:pointer;border:2px solid transparent;transition:all .15s;-webkit-tap-highlight-color:transparent}
+.mog-opt.mog-selected{background:var(--primary-cont);color:var(--primary);border-color:var(--primary)}
+.mog-opt.mog-danger{color:#b91c1c}
+.mog-opt.mog-danger.mog-selected{background:#fee2e2;border-color:#b91c1c;color:#b91c1c}
+/* ── SILICA PILLS ── */
+.silica-group{display:flex;gap:8px;margin-top:8px}
+.silica-pill{flex:1;padding:12px;border:none;border-radius:8px;font-size:13px;font-weight:700;font-family:'Space Grotesk',sans-serif;cursor:pointer;transition:all .15s;-webkit-tap-highlight-color:transparent;background:var(--surf-high);color:var(--gray)}
+.silica-pill.silica-blue-active{background:#dbeafe;color:#1d4ed8}
+.silica-pill.silica-orange-active{background:#ffedd5;color:#c2410c}
+/* ── HEADER BADGE override for yellow bg ── */
+#headerBadge .badge-blue{background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.3)}
 </style>
 </head>
 <body>
@@ -276,7 +343,7 @@ label{display:block;font-size:10px;color:var(--text-muted);font-weight:500;margi
   <div class="progress-dots" id="progressDots"></div>
 </div>
 <div id="screensWrap">
-  <div id="screen0" class="screen screen-padded"></div>
+  <div id="screen0" style="min-height:100dvh"></div>
   <div id="screen1" class="screen hidden"></div>
   <div id="screen2" class="screen hidden"></div>
   <div id="screen3" class="screen hidden"></div>
@@ -470,35 +537,60 @@ async function showHomeScreen(){
     else notDone++;
   });
   const dateStr=new Date().toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
+  const total=mySites.length||1;
+  const reportedPct=Math.round(((approved+pending)/total)*100);
   el.innerHTML=`
-    <div class="flex-between" style="padding:4px 0 8px">
-      <div>
-        <div style="font-size:14px;font-weight:700">Daily Generation Report</div>
-        <div style="font-size:10px;color:var(--gray)">Welcome, ${session.name||session.phone}</div>
+    <div class="home-header">
+      <div class="home-header-row">
+        <div>
+          <div class="home-header-brand">PM KUSUM · Stockwell Solar</div>
+          <div class="home-header-title">Field Reports</div>
+          <div style="font-size:10px;opacity:.65;margin-top:2px">${dateStr} · ${session.name||session.phone}</div>
+        </div>
+        <button class="home-logout" onclick="logout()">Logout</button>
       </div>
-      <button class="btn btn-secondary" style="padding:6px 12px;font-size:10px" onclick="logout()">Logout</button>
     </div>
-    <div class="stats-grid">
-      <div class="stat-card"><div class="stat-num" style="color:var(--green)">${approved}</div><div class="stat-label">Approved</div></div>
-      <div class="stat-card"><div class="stat-num" style="color:#eab308">${pending}</div><div class="stat-label">Pending</div></div>
-      <div class="stat-card"><div class="stat-num" style="color:var(--gray)">${notDone}</div><div class="stat-label">Not done</div></div>
+    <div class="home-progress">
+      <div class="home-progress-top">
+        <div>
+          <div style="font-size:10px;font-weight:600;color:var(--gray);text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Today's Progress</div>
+          <div class="home-progress-num">${approved+pending} <span>/ ${mySites.length} sites</span></div>
+        </div>
+        <div class="home-progress-pct">${reportedPct}% reported</div>
+      </div>
+      <div class="home-progress-bar"><div class="home-progress-fill" style="width:${reportedPct}%"></div></div>
+      <div class="home-progress-chips">
+        <span class="hpchip hpchip-green">✓ ${approved} Approved</span>
+        <span class="hpchip hpchip-amber">◷ ${pending} Pending</span>
+        <span class="hpchip hpchip-gray">○ ${notDone} Not done</span>
+      </div>
     </div>
-    <div class="card-title">Your sites today — ${dateStr}</div>
+    <div style="font-size:10px;font-weight:600;color:var(--gray);text-transform:uppercase;letter-spacing:.06em;padding:12px 14px 4px">Your Sites</div>
+    <div style="padding:0 14px 80px">
     ${mySites.map(s=>{
       const sub=todaySubmissions[s.site_name];
-      let dotClass='gray',badgeHtml='',actionHtml=`<span class="site-action">Fill now →</span>`;
-      if(sub&&sub.status==='approved'){dotClass='green';badgeHtml='<span class="badge badge-green">Approved</span>';actionHtml='';}
-      else if(sub){dotClass='amber';badgeHtml='<span class="badge badge-yellow">Pending</span>';actionHtml=`<span class="site-action">Edit →</span>`;}
-      const cap=s.dc_capacity_kw?`${s.dc_capacity_kw} kW DC`:'Not configured';
-      return `<div class="site-card" onclick="startDGR('${s.site_name}')">
-        <div class="site-dot ${dotClass}"></div>
-        <div class="site-info"><div class="site-name">${s.site_name}</div><div class="site-cap">${cap}</div></div>
-        <div style="display:flex;align-items:center;gap:6px">${badgeHtml}${actionHtml}</div>
+      let iconCls='site-icon-todo',iconHtml='<span class="material-symbols-outlined" style="font-size:20px;color:var(--gray)">solar_power</span>';
+      let badgeHtml=`<span class="badge badge-gray">Fill now →</span>`;
+      if(sub&&sub.status==='approved'){
+        iconCls='site-icon-ok';
+        iconHtml='<span class="material-symbols-outlined" style="font-size:20px;color:#16a34a;font-variation-settings:\'FILL\' 1">check_circle</span>';
+        badgeHtml='<span class="badge badge-green">Approved</span>';
+      } else if(sub){
+        iconCls='site-icon-pending';
+        iconHtml='<span class="material-symbols-outlined" style="font-size:20px;color:#a16207">schedule</span>';
+        badgeHtml='<span class="badge badge-yellow">Pending</span>';
+      }
+      const cap=s.dc_capacity_kw?`${s.dc_capacity_kw} kW · ${s.inverter_count||'?'} inv`:'Not configured';
+      return `<div class="site-card-new" onclick="startDGR('${s.site_name}')">
+        <div class="site-icon ${iconCls}">${iconHtml}</div>
+        <div class="site-card-info">
+          <div class="site-card-name">${s.site_name}</div>
+          <div class="site-card-cap">${cap}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:4px">${badgeHtml}<span class="material-symbols-outlined" style="font-size:18px;color:var(--gray)">chevron_right</span></div>
       </div>`;
     }).join('')}
     ${mySites.length===0?'<div class="card" style="text-align:center;color:var(--gray);padding:20px">No sites assigned. Contact your admin.</div>':''}
-    <div style="text-align:center;margin-top:12px">
-      <span style="font-size:10px;color:var(--text-muted);cursor:pointer" onclick="logout()">Logout</span>
     </div>
   `;
 }
@@ -594,8 +686,10 @@ function goToScreen(n){
   const titles=['','Site & Date','Inverter Generation','Performance','Grid & Plant Outage','Transformer','Cleaning','Weather & Activity','Photos','Review & Submit'];
   if(n>=1&&n<=9){
     hdr.classList.remove('hidden');
-    document.getElementById('headerTitle').textContent=titles[n]||'';
-    document.getElementById('headerSub').textContent=`Step ${n} of 9`;
+    const sitePart=formData.site_name?` · ${formData.site_name}`:'';
+    document.getElementById('headerTitle').textContent=(titles[n]||'')+sitePart;
+    const kwhPart=n>=2&&formData.total_gen_kwh?` · ${(+formData.total_gen_kwh).toLocaleString('en-IN')} kWh`:'';
+    document.getElementById('headerSub').textContent=`Step ${n} of 9${kwhPart}`;
     const badge=document.getElementById('headerBadge');
     if(n===2&&formData.inverter_count){
       const totalStr=(formData.strings_per_inv||[]).reduce((a,b)=>a+b,0);
@@ -909,27 +1003,31 @@ function buildScreen4(){
 
   el.innerHTML=`
     <div class="card">
-      <div class="flex-between">
-        <div><div style="font-size:12px;font-weight:600">Grid outage</div><div class="text-hint">Supply disruption today?</div></div>
-        <div class="toggle${formData.grid_outage?' on':''}" onclick="toggleGridOutage()"></div>
+      <div style="font-size:12px;font-weight:700;color:var(--text)">Grid Outage</div>
+      <div class="text-hint" style="margin-bottom:2px">Supply disruption from DISCOM today?</div>
+      <div class="yn-group">
+        <button class="yn-btn yn-btn-yes${formData.grid_outage?' yn-active':''}" onclick="if(!formData.grid_outage)toggleGridOutage()">YES</button>
+        <button class="yn-btn yn-btn-no${!formData.grid_outage?' yn-active':''}" onclick="if(formData.grid_outage)toggleGridOutage()">NO</button>
       </div>
       ${formData.grid_outage?`
-        <div style="margin-top:8px">
+        <div style="margin-top:10px">
           ${gridDetails.map((o,i)=>gridOutageBlock(o,i)).join('')}
-          ${totalGridMins>0?`<div style="text-align:right;margin-bottom:4px"><span class="badge badge-blue">Total grid outage: ${totalGridMins} min</span></div>`:''}
-          <button class="btn-dashed" onclick="addGridOutage()">+ Add grid outage window</button>
+          ${totalGridMins>0?`<div style="text-align:right;margin-bottom:4px"><span class="badge badge-blue">Total: ${totalGridMins} min</span></div>`:''}
+          <button class="btn-dashed" onclick="addGridOutage()">+ Add outage window</button>
         </div>`:''}
     </div>
     <div class="card">
-      <div class="flex-between">
-        <div><div style="font-size:12px;font-weight:600">Plant outage</div><div class="text-hint">Equipment failure today?</div></div>
-        <div class="toggle${formData.plant_outage?' on':''}" onclick="togglePlantOutage()"></div>
+      <div style="font-size:12px;font-weight:700;color:var(--text)">Plant Fault / Outage</div>
+      <div class="text-hint" style="margin-bottom:2px">Any equipment failure or fault today?</div>
+      <div class="yn-group">
+        <button class="yn-btn yn-btn-yes${formData.plant_outage?' yn-active':''}" onclick="if(!formData.plant_outage)togglePlantOutage()">YES</button>
+        <button class="yn-btn yn-btn-no${!formData.plant_outage?' yn-active':''}" onclick="if(formData.plant_outage)togglePlantOutage()">NO</button>
       </div>
       ${formData.plant_outage?`
-        <div style="margin-top:8px">
+        <div style="margin-top:10px">
           ${plantDetails.map((o,i)=>plantOutageBlock(o,i)).join('')}
-          ${totalPlantMins>0?`<div style="text-align:right;margin-bottom:4px"><span class="badge badge-red">Total plant outage: ${totalPlantMins} min</span></div>`:''}
-          <button class="btn-dashed" onclick="addPlantOutage()">+ Add plant outage window</button>
+          ${totalPlantMins>0?`<div style="text-align:right;margin-bottom:4px"><span class="badge badge-red">Total: ${totalPlantMins} min</span></div>`:''}
+          <button class="btn-dashed" onclick="addPlantOutage()">+ Add fault window</button>
         </div>`:''}
     </div>
   `;
@@ -957,53 +1055,53 @@ function buildScreen5(){
   const wti=formData.wti_c||0;
   const oti=formData.oti_c||0;
   const mogOpts=MOG_OPTIONS.map(o=>`<option value="${o}"${formData.mog_level===o?' selected':''}>${o}</option>`).join('');
+  const mogDangerOpts=['Critical','Low'];
   el.innerHTML=`
     <div class="card">
-      <div class="card-title">Winding Temperature Indicator (WTI)</div>
-      <div class="text-hint" style="margin-bottom:6px">Peak reading during 12:00 – 14:00</div>
-      <div class="grid-2">
-        <div><label>WTI reading (°C)</label>
-          <input type="number" inputmode="decimal" value="${formData.wti_c||''}" placeholder="0"
-            style="font-size:15px;font-weight:700;text-align:center"
+      <div style="font-size:12px;font-weight:700;color:var(--text)">Transformer Temperature</div>
+      <div class="text-hint" style="margin-bottom:4px">Peak readings during 12:00 – 14:00</div>
+      <div class="equip-card-grid">
+        <div class="equip-card">
+          <div class="equip-card-label">WTI (Winding)</div>
+          <input type="number" inputmode="decimal" value="${formData.wti_c||''}" placeholder="—"
             onchange="formData.wti_c=parseFloat(this.value)||0;updateWTIDisplay()">
-          <div class="level-bar" style="margin-top:4px"><div class="level-fill ${tempColor(wti)}" id="wtiBar" style="width:${Math.min(wti,120)/1.2}%"></div></div>
-          <div class="text-hint" style="text-align:center;margin-top:2px" id="wtiStatus">${wti>0?tempColor(wti).toUpperCase():''}</div>
+          <div class="equip-card-unit" id="wtiStatus">${wti>0?(wti>85?'⚠ HIGH':wti>=75?'WARM':'OK'):''}</div>
         </div>
-        <div><label>Peak time (12–14)</label>
-          <input type="time" value="${formData.wti_peak_time||''}" min="12:00" max="14:00"
-            onchange="formData.wti_peak_time=this.value">
-        </div>
-      </div>
-      ${wti>85?`<div class="warning-box" style="margin-top:6px">WTI ${wti}°C exceeds 85°C — flagged for review</div>`:''}
-    </div>
-    <div class="card">
-      <div class="card-title">Oil Temperature Indicator (OTI)</div>
-      <div class="text-hint" style="margin-bottom:6px">Peak reading during 12:00 – 14:00</div>
-      <div class="grid-2">
-        <div><label>OTI reading (°C)</label>
-          <input type="number" inputmode="decimal" value="${formData.oti_c||''}" placeholder="0"
-            style="font-size:15px;font-weight:700;text-align:center"
+        <div class="equip-card">
+          <div class="equip-card-label">OTI (Oil)</div>
+          <input type="number" inputmode="decimal" value="${formData.oti_c||''}" placeholder="—"
             onchange="formData.oti_c=parseFloat(this.value)||0;updateOTIDisplay()">
-          <div class="level-bar" style="margin-top:4px"><div class="level-fill ${tempColor(oti)}" id="otiBar" style="width:${Math.min(oti,120)/1.2}%"></div></div>
-          <div class="text-hint" style="text-align:center;margin-top:2px" id="otiStatus">${oti>0?tempColor(oti).toUpperCase():''}</div>
+          <div class="equip-card-unit" id="otiStatus">${oti>0?(oti>85?'⚠ HIGH':oti>=75?'WARM':'OK'):''}</div>
         </div>
-        <div><label>Peak time (12–14)</label>
+        <div class="equip-card">
+          <div class="equip-card-label">WTI Peak Time</div>
+          <input type="time" value="${formData.wti_peak_time||''}" min="12:00" max="14:00"
+            style="font-size:13px;font-weight:600;text-align:center"
+            onchange="formData.wti_peak_time=this.value">
+          <div class="equip-card-unit">12–14 window</div>
+        </div>
+        <div class="equip-card">
+          <div class="equip-card-label">OTI Peak Time</div>
           <input type="time" value="${formData.oti_peak_time||''}" min="12:00" max="14:00"
+            style="font-size:13px;font-weight:600;text-align:center"
             onchange="formData.oti_peak_time=this.value">
+          <div class="equip-card-unit">12–14 window</div>
         </div>
+      </div>
+      ${wti>85?`<div class="warning-box" style="margin-top:8px">WTI ${wti}°C exceeds 85°C — flagged for review</div>`:''}
+    </div>
+    <div class="card">
+      <div style="font-size:12px;font-weight:700;color:var(--text)">MOG Oil Level</div>
+      <div class="mog-grid">
+        ${MOG_OPTIONS.map(o=>`<div class="mog-opt${formData.mog_level===o?' mog-selected':''}${mogDangerOpts.includes(o)?' mog-danger':''}" onclick="formData.mog_level='${o}';buildScreen5()">${o}</div>`).join('')}
       </div>
     </div>
     <div class="card">
-      <div class="card-title">MOG Oil Level</div>
-      <select onchange="formData.mog_level=this.value">
-        <option value="">Select level</option>${mogOpts}
-      </select>
-    </div>
-    <div class="card">
-      <div class="card-title">Silica gel colour</div>
-      <div style="display:flex;gap:10px">
-        <div class="opt-pill${formData.silica_gel==='Blue'?' selected':''}" onclick="formData.silica_gel='Blue';buildScreen5()">🔵 Blue</div>
-        <div class="opt-pill${formData.silica_gel==='Orange'?' selected':''}" onclick="formData.silica_gel='Orange';buildScreen5()">🟠 Orange</div>
+      <div style="font-size:12px;font-weight:700;color:var(--text)">Silica Gel Colour</div>
+      <div class="text-hint" style="margin-bottom:2px">Current colour of transformer silica gel beads</div>
+      <div class="silica-group">
+        <button class="silica-pill${formData.silica_gel==='Blue'?' silica-blue-active':''}" onclick="formData.silica_gel='Blue';buildScreen5()">🔵 Blue (Active)</button>
+        <button class="silica-pill${formData.silica_gel==='Orange'?' silica-orange-active':''}" onclick="formData.silica_gel='Orange';buildScreen5()">🟠 Orange (Replace)</button>
       </div>
     </div>
   `;
