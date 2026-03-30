@@ -368,10 +368,11 @@ label{display:block;font-size:10px;color:var(--text-muted);font-weight:500;margi
 <div id="modalOverlay" class="modal-overlay hidden" onclick="closeModal(event)">
   <div class="modal-content" id="modalContent" onclick="event.stopPropagation()"></div>
 </div>
-<input type="file" id="photoInput" accept="image/*" capture="environment" class="hidden" onchange="handlePhoto(event)">
+<input type="file" id="photoInput" accept="image/*" class="hidden" onchange="handlePhoto(event)">
 <input type="file" id="csvInput" accept=".csv" class="hidden" onchange="handleCSV(event)">
 <input type="file" id="siteCsvInput" accept=".csv" class="hidden" onchange="handleSiteBulkCSV(event)">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.mini.min.js"></script>
 <script>
 // CONFIG
 const SUPABASE_URL='https://yvlagovdcxwmfkefdrnv.supabase.co';
@@ -472,21 +473,30 @@ async function loadSites(){
     if(cached)sites=JSON.parse(cached);
   }
 }
-async function loadAppSettings(){// app_options table structure unknown, use localStorage fallback
-  const cached=localStorage.getItem("dgr_app_settings");
-  if(cached){try{const s=JSON.parse(cached);if(s.grid_outage_reasons)appSettings.grid_outage_reasons=s.grid_outage_reasons;if(s.plant_fault_codes)appSettings.plant_fault_codes=s.plant_fault_codes;}catch(e){}}
-  // original load below (silent fail if columns mismatch)
-  
+async function loadAppSettings(){
   try{
-    const{data}=await sb.from('app_options').select('*');
+    const{data}=await sb.from('dgr_settings').select('key,value');
     if(data){
       data.forEach(r=>{
-        if(r.key==='grid_outage_reasons'&&r.value)appSettings.grid_outage_reasons=r.value;
-        if(r.key==='plant_fault_codes'&&r.value)appSettings.plant_fault_codes=r.value;
+        // value is JSONB — parse it (strings come back as JS strings, arrays as arrays)
+        const v=r.value;
+        if(r.key==='grid_outage_reasons'&&v)appSettings.grid_outage_reasons=v;
+        if(r.key==='plant_fault_codes'&&v)appSettings.plant_fault_codes=v;
+        if(r.key==='sheets_script_url')sheetsSettings.script_url=typeof v==='string'?v:(v||'');
+        if(r.key==='sheets_sheet_id')sheetsSettings.sheet_id=typeof v==='string'?v:'1agcGb0nTi1u-hEOlHU1eXt30wsWyEeK_';
+        if(r.key==='sheets_tab_name')sheetsSettings.tab_name=typeof v==='string'?v:'Raw Data';
+        if(r.key==='sheets_last_sync')sheetsSettings.last_sync=typeof v==='string'?v:'';
       });
     }
-  }catch(e){/* use defaults */}
+    // persist to localStorage as fallback
+    localStorage.setItem("dgr_app_settings",JSON.stringify(appSettings));
+  }catch(e){
+    // fallback to localStorage if DB unavailable
+    const cached=localStorage.getItem("dgr_app_settings");
+    if(cached){try{const s=JSON.parse(cached);if(s.grid_outage_reasons)appSettings.grid_outage_reasons=s.grid_outage_reasons;if(s.plant_fault_codes)appSettings.plant_fault_codes=s.plant_fault_codes;}catch(e2){}}
+  }
 }
+let sheetsSettings={script_url:'',sheet_id:'1agcGb0nTi1u-hEOlHU1eXt30wsWyEeK_',tab_name:'Raw Data',last_sync:''};
 
 // BOTTOM TABS
 function buildBottomTabs(){
@@ -1552,6 +1562,7 @@ function showHistory(){
       </div>
       <button class="btn btn-primary" style="width:100%;padding:8px;font-size:12px" onclick="loadHistory()">Search</button>
     </div>
+    ${(session.role==='manager'||session.role==='admin')?buildDownloadPanel():''}
     <div id="historyResults"><div style="text-align:center;color:var(--gray);padding:20px">Press Search to load results</div></div>`;
   loadHistory();
 }
@@ -1938,6 +1949,8 @@ async function showAdminSettings(){
       </div>
     </div>
     <div id="settingsSaveStatus" style="font-size:11px;color:var(--green);text-align:center;margin-top:4px"></div>
+    ${buildSheetsSettingsPanel()}
+    ${buildDownloadPanel()}
   `;
 }
 async function addSettingItem(settingKey){
@@ -1955,10 +1968,8 @@ async function removeSettingItem(settingKey,idx){
 }
 async function saveAppSetting(key){
   localStorage.setItem("dgr_app_settings",JSON.stringify(appSettings));
-  // try Supabase too (silent fail)
-  
   try{
-    await sb.from('app_options').upsert({key,value:appSettings[key]},{onConflict:'key'});
+    await sb.from('dgr_settings').upsert({key,value:appSettings[key],updated_at:new Date().toISOString()},{onConflict:'key'});
     const el=document.getElementById('settingsSaveStatus');
     if(el){el.textContent='Saved ✓';setTimeout(()=>{if(el)el.textContent='';},2000);}
   }catch(e){alert('Save failed: '+e.message);}
@@ -2090,6 +2101,228 @@ async function viewSubmission(id){
 function closeModal(e){
   if(e&&e.target&&e.target!==document.getElementById('modalOverlay'))return;
   document.getElementById('modalOverlay').classList.add('hidden');
+}
+
+// ─────────────────────────────────────────
+// DGR EXPORT UTILITIES
+// ─────────────────────────────────────────
+function calcOutageMins(o){
+  if(!o||!o.from||!o.to)return 0;
+  const[fh,fm]=o.from.split(':').map(Number);
+  const[th,tm]=o.to.split(':').map(Number);
+  return Math.max(0,(th*60+tm)-(fh*60+fm));
+}
+
+function formatDgrRowForSheet(d){
+  const gridMins=(d.grid_outage_details||[]).reduce((a,o)=>a+calcOutageMins(o),0);
+  const plantMins=(d.plant_outage_details||[]).reduce((a,o)=>a+calcOutageMins(o),0);
+  const gridReasons=(d.grid_outage_details||[]).map(o=>o.reason||'').filter(Boolean).join('; ');
+  const plantFaults=(d.plant_outage_details||[]).map(o=>o.fault_code||'').filter(Boolean).join('; ');
+  const inv=d.inv_gen||[];
+  const invCols=Array.from({length:20},(_,i)=>inv[i]!==undefined?inv[i]:'');
+  return[
+    d.report_date,d.site_name,d.submitted_by_name,d.submitted_by_phone,
+    d.created_at?new Date(d.created_at).toLocaleString('en-IN'):'',
+    d.status,d.reviewed_by||'',
+    d.reviewed_at?new Date(d.reviewed_at).toLocaleString('en-IN'):'',
+    d.review_note||'',
+    d.dc_capacity_kw||'',d.ac_capacity_kw||'',d.total_gen_kwh||'',
+    d.dc_cuf_pct||'',d.ac_cuf_pct||'',d.pr_pct||'',
+    d.peak_radiation_wm2||'',d.poa_kwh_m2||'',d.peak_power_kwh||'',
+    ...invCols,
+    d.grid_outage?'Yes':'No',gridMins,gridReasons,
+    d.plant_outage?'Yes':'No',plantMins,plantFaults,
+    d.wti_c||'',d.oti_c||'',d.mog_level||'',d.silica_gel||'',
+    d.modules_cleaned_today||'',d.modules_total||'',
+    d.weather||'',d.rain?'Yes':'No',d.weather_avg_ambient_c||'',
+    d.daily_activity||'',d.remarks||''
+  ];
+}
+
+const DGR_SHEET_HEADERS=[
+  'Date','Site Name','Submitted By','Submitted Phone','Submitted At',
+  'Status','Reviewed By','Reviewed At','Review Note',
+  'DC Capacity (kW)','AC Capacity (kW)','Total Generation (kWh)',
+  'DC CUF (%)','AC CUF (%)','PR (%)',
+  'Peak Radiation (W/m²)','POA (kWh/m²)','Peak Power (kWh)',
+  'Inv 1 (kWh)','Inv 2 (kWh)','Inv 3 (kWh)','Inv 4 (kWh)','Inv 5 (kWh)',
+  'Inv 6 (kWh)','Inv 7 (kWh)','Inv 8 (kWh)','Inv 9 (kWh)','Inv 10 (kWh)',
+  'Inv 11 (kWh)','Inv 12 (kWh)','Inv 13 (kWh)','Inv 14 (kWh)','Inv 15 (kWh)',
+  'Inv 16 (kWh)','Inv 17 (kWh)','Inv 18 (kWh)','Inv 19 (kWh)','Inv 20 (kWh)',
+  'Grid Outage','Grid Outage (mins)','Grid Outage Reasons',
+  'Plant Outage','Plant Outage (mins)','Plant Fault Codes',
+  'WTI (°C)','OTI (°C)','MOG Level','Silica Gel',
+  'Modules Cleaned Today','Total Modules',
+  'Weather','Rain','Avg Ambient Temp (°C)',
+  'Daily Activity','Remarks'
+];
+
+async function downloadDgrExcel(){
+  const site=document.getElementById('dlSite')?.value||'';
+  const from=document.getElementById('dlFrom')?.value||'';
+  const to=document.getElementById('dlTo')?.value||'';
+  const status=document.getElementById('dlStatus')?.value||'all';
+  const btn=document.getElementById('dlBtn');
+  if(btn){btn.disabled=true;btn.textContent='Preparing...';}
+  try{
+    let query=sb.from('dgr_submissions').select('*').order('report_date',{ascending:true});
+    if(site)query=query.eq('site_name',site);
+    if(from)query=query.gte('report_date',from);
+    if(to)query=query.lte('report_date',to);
+    if(status!=='all')query=query.eq('status',status);
+    const{data,error}=await query;
+    if(error)throw error;
+    if(!data||data.length===0){alert('No records found for selected filters.');return;}
+    const rows=data.map(d=>formatDgrRowForSheet(d));
+    const ws=XLSX.utils.aoa_to_sheet([DGR_SHEET_HEADERS,...rows]);
+    ws['!cols']=DGR_SHEET_HEADERS.map(h=>({wch:Math.max(h.length+2,12)}));
+    // Freeze top row
+    ws['!freeze']={xSplit:0,ySplit:1};
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws,'DGR Data');
+    const sitePart=site?site.replace(/[^a-zA-Z0-9]/g,'_'):'AllSites';
+    const fromPart=from||'start';
+    const toPart=to||'end';
+    XLSX.writeFile(wb,`DGR_${sitePart}_${fromPart}_to_${toPart}.xlsx`);
+  }catch(e){
+    alert('Download failed: '+e.message);
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent='Download Excel (.xlsx)';}
+  }
+}
+
+function buildDownloadPanel(){
+  const siteOpts='<option value="">All Sites</option>'+
+    (session.role==='engineer'
+      ?(session.assigned_sites||[])
+      :sites.map(s=>s.site_name)
+    ).map?.(s=>`<option value="${s}">${s}</option>`).join('') ||
+    sites.map(s=>`<option value="${s.site_name}">${s.site_name}</option>`).join('');
+  // Default date range: last 30 days
+  const today=new Date();
+  const d30=new Date(today);d30.setDate(d30.getDate()-30);
+  const fmt=d=>d.toISOString().split('T')[0];
+  return`
+    <div class="card" style="margin-top:12px">
+      <div class="card-title" style="margin-bottom:10px">Download DGR Data</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div>
+          <label style="font-size:10px;color:var(--gray);display:block;margin-bottom:3px">Site</label>
+          <select id="dlSite" style="width:100%;padding:8px;font-size:12px;border:1px solid var(--border);border-radius:6px;background:#fff">
+            ${siteOpts}
+          </select>
+        </div>
+        <div style="display:flex;gap:8px">
+          <div style="flex:1">
+            <label style="font-size:10px;color:var(--gray);display:block;margin-bottom:3px">From Date</label>
+            <input type="date" id="dlFrom" value="${fmt(d30)}" style="width:100%;padding:7px;font-size:12px;border:1px solid var(--border);border-radius:6px;box-sizing:border-box">
+          </div>
+          <div style="flex:1">
+            <label style="font-size:10px;color:var(--gray);display:block;margin-bottom:3px">To Date</label>
+            <input type="date" id="dlTo" value="${fmt(today)}" style="width:100%;padding:7px;font-size:12px;border:1px solid var(--border);border-radius:6px;box-sizing:border-box">
+          </div>
+        </div>
+        <div>
+          <label style="font-size:10px;color:var(--gray);display:block;margin-bottom:3px">Status</label>
+          <select id="dlStatus" style="width:100%;padding:8px;font-size:12px;border:1px solid var(--border);border-radius:6px;background:#fff">
+            <option value="all">All</option>
+            <option value="approved" selected>Approved</option>
+            <option value="pending">Pending</option>
+            <option value="rejected">Rejected</option>
+          </select>
+        </div>
+        <button id="dlBtn" class="btn btn-primary" onclick="downloadDgrExcel()" style="width:100%;padding:10px;font-size:13px;margin-top:4px">
+          Download Excel (.xlsx)
+        </button>
+      </div>
+    </div>`;
+}
+
+// ─────────────────────────────────────────
+// GOOGLE SHEETS SYNC
+// ─────────────────────────────────────────
+function buildSheetsSettingsPanel(){
+  // Parse last sync info: stored as "ISO_TIMESTAMP|COUNT"
+  let lastSyncLabel='Never';
+  if(sheetsSettings.last_sync){
+    try{
+      const[ts,cnt]=sheetsSettings.last_sync.split('|');
+      const d=new Date(ts);
+      lastSyncLabel=d.toLocaleString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})+' · '+cnt+' row(s)';
+    }catch(e){}
+  }
+  const hasUrl=sheetsSettings.script_url&&sheetsSettings.script_url.length>10;
+  return`
+    <div class="card" style="margin-top:12px">
+      <div class="card-title" style="margin-bottom:10px">Google Sheets Sync</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div>
+          <label style="font-size:10px;color:var(--gray);display:block;margin-bottom:3px">Sheet ID</label>
+          <input id="gsSheetId" value="${sheetsSettings.sheet_id}" style="width:100%;padding:8px;font-size:11px;border:1px solid var(--border);border-radius:6px;box-sizing:border-box;font-family:monospace" placeholder="Paste Sheet ID from URL">
+        </div>
+        <div>
+          <label style="font-size:10px;color:var(--gray);display:block;margin-bottom:3px">Tab Name</label>
+          <input id="gsTabName" value="${sheetsSettings.tab_name}" style="width:100%;padding:8px;font-size:12px;border:1px solid var(--border);border-radius:6px;box-sizing:border-box" placeholder="e.g. Raw Data">
+        </div>
+        <div>
+          <label style="font-size:10px;color:var(--gray);display:block;margin-bottom:3px">Apps Script URL</label>
+          <input id="gsScriptUrl" value="${sheetsSettings.script_url}" style="width:100%;padding:8px;font-size:11px;border:1px solid var(--border);border-radius:6px;box-sizing:border-box;font-family:monospace" placeholder="https://script.google.com/macros/s/.../exec">
+        </div>
+        <button class="btn btn-secondary" onclick="saveSheetsSettings()" style="width:100%;padding:8px;font-size:12px">Save Settings</button>
+        <div style="display:flex;gap:8px">
+          <button id="gsSyncBtn" class="btn btn-primary" onclick="triggerManualSync()" style="flex:2;padding:9px;font-size:12px" ${!hasUrl?'disabled title="Save Apps Script URL first"':''}>
+            🔄 Sync Now
+          </button>
+          ${sheetsSettings.sheet_id?`<button class="btn btn-secondary" onclick="window.open('https://docs.google.com/spreadsheets/d/${sheetsSettings.sheet_id}','_blank')" style="flex:1;padding:9px;font-size:12px">View Sheet</button>`:''}
+        </div>
+        <div style="font-size:10px;color:var(--gray);text-align:center">
+          Last sync: <strong>${lastSyncLabel}</strong> · Auto-sync every 30 min
+        </div>
+        <div id="gsSyncStatus" style="font-size:11px;text-align:center;display:none"></div>
+      </div>
+    </div>`;
+}
+
+async function saveSheetsSettings(){
+  const scriptUrl=(document.getElementById('gsScriptUrl')?.value||'').trim();
+  const sheetId=(document.getElementById('gsSheetId')?.value||'').trim();
+  const tabName=(document.getElementById('gsTabName')?.value||'').trim();
+  if(!sheetId||!tabName){alert('Sheet ID and Tab Name are required.');return;}
+  sheetsSettings.script_url=scriptUrl;
+  sheetsSettings.sheet_id=sheetId;
+  sheetsSettings.tab_name=tabName;
+  try{
+    await sb.from('dgr_settings').upsert([
+      {key:'sheets_script_url',value:scriptUrl,updated_at:new Date().toISOString()},
+      {key:'sheets_sheet_id',value:sheetId,updated_at:new Date().toISOString()},
+      {key:'sheets_tab_name',value:tabName,updated_at:new Date().toISOString()}
+    ],{onConflict:'key'});
+    const el=document.getElementById('settingsSaveStatus');
+    if(el){el.textContent='Sheets settings saved ✓';setTimeout(()=>{if(el)el.textContent='';},2500);}
+    showAdminSettings();// re-render to update Sync Now button state
+  }catch(e){alert('Save failed: '+e.message);}
+}
+
+async function triggerManualSync(){
+  const btn=document.getElementById('gsSyncBtn');
+  const statusEl=document.getElementById('gsSyncStatus');
+  if(btn){btn.disabled=true;btn.textContent='Syncing...';}
+  if(statusEl){statusEl.style.display='block';statusEl.style.color='var(--gray)';statusEl.textContent='Connecting to Google Sheets…';}
+  try{
+    const{data,error}=await sb.functions.invoke('sync-to-sheets',{body:{}});
+    if(error)throw error;
+    const count=data?.synced??0;
+    if(statusEl){
+      statusEl.style.color='var(--green-dark)';
+      statusEl.textContent=count>0?`✓ Synced ${count} row(s) to Google Sheets`:'✓ All rows already synced — nothing new';
+    }
+    // Refresh panel to update last sync time
+    await loadAppSettings();
+    showAdminSettings();
+  }catch(e){
+    if(statusEl){statusEl.style.color='var(--red)';statusEl.textContent='✗ Sync failed: '+e.message;}
+    if(btn){btn.disabled=false;btn.textContent='🔄 Sync Now';}
+  }
 }
 
 // OFFLINE
