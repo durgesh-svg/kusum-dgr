@@ -398,6 +398,8 @@ let photoFiles={};  // keyed by slot name
 let acknowledgements={inv_zero:false,pr_low:false,temp_high:false};
 let todaySubmissions={};
 let appSettings={grid_outage_reasons:[...DEFAULT_GRID_REASONS],plant_fault_codes:[...DEFAULT_FAULT_CODES]};
+let progressDate=new Date().toISOString().split('T')[0]; // selected date for home progress widget
+let show5Day=false; // 5-day panel toggle
 
 // AUTH
 async function hashPassword(pwd){
@@ -533,9 +535,11 @@ async function showHomeScreen(){
   const el=document.getElementById('screen0');
   el.classList.remove('hidden');
   const mySites=session.role==='engineer'?sites.filter(s=>session.assigned_sites.includes(s.site_name)):sites;
-  const today=new Date().toISOString().split('T')[0];
+  const todayStr=new Date().toISOString().split('T')[0];
+  const isToday=progressDate===todayStr;
+  const dateLabel=isToday?'Today':new Date(progressDate+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'});
   try{
-    const{data}=await sb.from('dgr_submissions').select('site_name,status,submitted_by_name,created_at').eq('report_date',today);
+    const{data}=await sb.from('dgr_submissions').select('site_name,status,submitted_by_name,created_at').eq('report_date',progressDate);
     todaySubmissions={};
     if(data)data.forEach(d=>{todaySubmissions[d.site_name]=d;});
   }catch(e){}
@@ -562,11 +566,18 @@ async function showHomeScreen(){
     </div>
     <div class="home-progress">
       <div class="home-progress-top">
-        <div>
-          <div style="font-size:10px;font-weight:600;color:var(--gray);text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Today's Progress</div>
+        <div style="flex:1">
+          <div style="display:flex;align-items:center;gap:5px;margin-bottom:3px">
+            <button onclick="changeProgressDate(-1)" style="background:none;border:none;cursor:pointer;padding:0 2px;color:var(--primary);font-size:18px;line-height:1;font-weight:300">‹</button>
+            <div style="font-size:10px;font-weight:600;color:var(--gray);text-transform:uppercase;letter-spacing:.04em">${dateLabel}</div>
+            <button onclick="changeProgressDate(1)" ${isToday?'disabled':''}style="background:none;border:none;cursor:pointer;padding:0 2px;font-size:18px;line-height:1;font-weight:300;${isToday?'opacity:.25;cursor:default;':'color:var(--primary);'}">›</button>
+          </div>
           <div class="home-progress-num">${approved+pending} <span>/ ${mySites.length} sites</span></div>
         </div>
-        <div class="home-progress-pct">${reportedPct}% reported</div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px">
+          <div class="home-progress-pct">${reportedPct}% reported</div>
+          <button onclick="toggle5Day()" style="font-size:9px;color:var(--primary);background:none;border:none;cursor:pointer;padding:0;font-weight:600;letter-spacing:.02em">${show5Day?'Hide ↑':'5 Days ↗'}</button>
+        </div>
       </div>
       <div class="home-progress-bar"><div class="home-progress-fill" style="width:${reportedPct}%"></div></div>
       <div class="home-progress-chips">
@@ -574,6 +585,7 @@ async function showHomeScreen(){
         <span class="hpchip hpchip-amber">◷ ${pending} Pending</span>
         <span class="hpchip hpchip-gray">○ ${notDone} Not done</span>
       </div>
+      ${show5Day?await build5DayPanel(mySites):''}
     </div>
     <div style="font-size:10px;font-weight:600;color:var(--gray);text-transform:uppercase;letter-spacing:.06em;padding:12px 14px 4px">Your Sites</div>
     <div style="padding:0 14px 80px">
@@ -603,6 +615,63 @@ async function showHomeScreen(){
     ${mySites.length===0?'<div class="card" style="text-align:center;color:var(--gray);padding:20px">No sites assigned. Contact your admin.</div>':''}
     </div>
   `;
+}
+
+// PROGRESS DATE NAV
+function changeProgressDate(delta){
+  const d=new Date(progressDate+'T00:00:00');
+  d.setDate(d.getDate()+delta);
+  const next=d.toISOString().split('T')[0];
+  const todayStr=new Date().toISOString().split('T')[0];
+  if(next>todayStr)return;
+  progressDate=next;
+  show5Day=false;
+  showHomeScreen();
+}
+function toggle5Day(){show5Day=!show5Day;showHomeScreen();}
+async function build5DayPanel(mySites){
+  const dates=[];
+  const base=new Date(progressDate+'T00:00:00');
+  for(let i=0;i<5;i++){const d=new Date(base);d.setDate(base.getDate()-i);dates.push(d.toISOString().split('T')[0]);}
+  let q=sb.from('dgr_submissions').select('site_name,status,report_date').in('report_date',dates);
+  if(session.role==='engineer')q=q.eq('submitted_by_phone',session.phone);
+  let data=[];
+  try{const r=await q;data=r.data||[];}catch(e){}
+  const byDate={};
+  dates.forEach(d=>{byDate[d]={approved:0,pending:0};});
+  data.forEach(r=>{
+    if(!byDate[r.report_date])return;
+    if(r.status==='approved')byDate[r.report_date].approved++;
+    else byDate[r.report_date].pending++;
+  });
+  const total=mySites.length||1;
+  const todayStr=new Date().toISOString().split('T')[0];
+  const rows=dates.map(d=>{
+    const{approved,pending}=byDate[d];
+    const left=total-approved-pending;
+    const pct=Math.round(((approved+pending)/total)*100);
+    const isSelected=d===progressDate;
+    const label=d===todayStr?'Today':new Date(d+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'});
+    return `<tr style="cursor:pointer;${isSelected?'background:#eef2ff;':''}border-bottom:1px solid var(--border)" onclick="progressDate='${d}';show5Day=true;showHomeScreen()">
+      <td style="padding:6px 6px;font-size:10px;font-weight:${isSelected?'700':'400'}">${label}</td>
+      <td style="padding:6px 6px;font-size:10px;color:var(--green-dark);text-align:center">${approved}</td>
+      <td style="padding:6px 6px;font-size:10px;color:var(--amber);text-align:center">${pending}</td>
+      <td style="padding:6px 6px;font-size:10px;color:var(--gray);text-align:center">${left}</td>
+      <td style="padding:6px 6px;font-size:10px;font-weight:600;text-align:right">${pct}%</td>
+    </tr>`;
+  }).join('');
+  return `<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:6px">
+    <table style="width:100%;border-collapse:collapse">
+      <thead><tr style="border-bottom:1px solid var(--border)">
+        <th style="padding:3px 6px;font-size:9px;color:var(--gray);font-weight:600;text-align:left">Date</th>
+        <th style="padding:3px 6px;font-size:9px;color:var(--green-dark);font-weight:600;text-align:center">✓ App</th>
+        <th style="padding:3px 6px;font-size:9px;color:var(--amber);font-weight:600;text-align:center">◷ Pend</th>
+        <th style="padding:3px 6px;font-size:9px;color:var(--gray);font-weight:600;text-align:center">○ Left</th>
+        <th style="padding:3px 6px;font-size:9px;color:var(--gray);font-weight:600;text-align:right">%</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
 }
 
 // START DGR
