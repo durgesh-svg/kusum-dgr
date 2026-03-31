@@ -567,10 +567,10 @@ async function showHomeScreen(){
     <div class="home-progress">
       <div class="home-progress-top">
         <div style="flex:1">
-          <div style="display:flex;align-items:center;gap:5px;margin-bottom:3px">
-            <button onclick="changeProgressDate(-1)" style="background:none;border:none;cursor:pointer;padding:0 2px;color:var(--primary);font-size:18px;line-height:1;font-weight:300">‹</button>
-            <div style="font-size:10px;font-weight:600;color:var(--gray);text-transform:uppercase;letter-spacing:.04em">${dateLabel}</div>
-            <button onclick="changeProgressDate(1)" style="background:none;border:none;padding:0 2px;font-size:18px;line-height:1;font-weight:300;${isToday?'opacity:.25;cursor:not-allowed;color:var(--gray);':'cursor:pointer;color:var(--primary);'}" ${isToday?'disabled':''}>›</button>
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+            <button onclick="changeProgressDate(-1)" style="background:none;border:none;cursor:pointer;padding:0 4px;color:var(--primary);font-size:26px;line-height:1">‹</button>
+            <input type="date" value="${progressDate}" max="${todayStr}" onchange="progressDate=this.value;show5Day=false;showHomeScreen()" style="border:none;background:none;font-size:13px;font-weight:700;color:var(--text);cursor:pointer;padding:0;width:120px;outline:none">
+            <button onclick="changeProgressDate(1)" style="background:none;border:none;cursor:pointer;padding:0 4px;font-size:26px;line-height:1;${isToday?'opacity:.2;pointer-events:none;color:var(--gray);':'color:var(--primary);'}">›</button>
           </div>
           <div class="home-progress-num">${approved+pending} <span>/ ${mySites.length} sites</span></div>
         </div>
