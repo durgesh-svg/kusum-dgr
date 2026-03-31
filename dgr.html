@@ -570,7 +570,7 @@ async function showHomeScreen(){
           <div style="display:flex;align-items:center;gap:5px;margin-bottom:3px">
             <button onclick="changeProgressDate(-1)" style="background:none;border:none;cursor:pointer;padding:0 2px;color:var(--primary);font-size:18px;line-height:1;font-weight:300">‹</button>
             <div style="font-size:10px;font-weight:600;color:var(--gray);text-transform:uppercase;letter-spacing:.04em">${dateLabel}</div>
-            <button onclick="changeProgressDate(1)" ${isToday?'disabled':''}style="background:none;border:none;cursor:pointer;padding:0 2px;font-size:18px;line-height:1;font-weight:300;${isToday?'opacity:.25;cursor:default;':'color:var(--primary);'}">›</button>
+            <button onclick="changeProgressDate(1)" style="background:none;border:none;padding:0 2px;font-size:18px;line-height:1;font-weight:300;${isToday?'opacity:.25;cursor:not-allowed;color:var(--gray);':'cursor:pointer;color:var(--primary);'}" ${isToday?'disabled':''}>›</button>
           </div>
           <div class="home-progress-num">${approved+pending} <span>/ ${mySites.length} sites</span></div>
         </div>
