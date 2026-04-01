@@ -1874,6 +1874,7 @@ async function showAdminSites(){
     const{data}=await sb.from('site_config').select('*').order('site_name');
     el.innerHTML=`
       <div style="display:flex;gap:6px;margin-bottom:8px">
+        <button class="btn btn-primary" style="flex:1;padding:8px;font-size:11px" onclick="openNewSiteModal()">+ Add Site</button>
         <button class="btn btn-secondary" style="flex:1;padding:8px;font-size:11px" onclick="document.getElementById('siteCsvInput').click()">Bulk CSV</button>
         <button class="btn btn-secondary" style="flex:1;padding:8px;font-size:11px" onclick="downloadSiteTemplate()">Template</button>
       </div>
@@ -1948,6 +1949,26 @@ async function handleSiteBulkCSV(e){
   alert(updated+' site(s) updated.'+(errors.length?'\n\nErrors:\n'+errors.join('\n'):''));
   await loadSites();showAdminSites();
 }
+function openNewSiteModal(){
+  const modal=document.getElementById('modalOverlay');
+  const content=document.getElementById('modalContent');
+  content.innerHTML=`
+    <div class="modal-header"><div class="modal-title">Add New Site</div><button class="modal-close" onclick="closeModal()">✕</button></div>
+    <div class="modal-field"><label>Site name *</label><input id="mSiteName" placeholder="e.g. Bidasar"></div>
+    <div class="modal-field"><label>DC capacity (kW)</label><input id="mSiteDC" type="number" placeholder="2000"></div>
+    <div class="modal-field"><label>AC capacity (kW)</label><input id="mSiteAC" type="number" placeholder="1800"></div>
+    <div class="modal-field"><label>Inverter count</label><input id="mSiteInv" type="number" placeholder="10"></div>
+    <div class="modal-field"><label>Strings per inverter (comma-separated)</label>
+      <input id="mSiteStr" placeholder="26,26,25,...">
+    </div>
+    <div class="modal-field"><label>Total modules on site</label><input id="mSiteMods" type="number" placeholder="3500"></div>
+    <div class="modal-field"><label>Latitude</label><input id="mSiteLat" type="number" step="any" placeholder="28.6139"></div>
+    <div class="modal-field"><label>Longitude</label><input id="mSiteLng" type="number" step="any" placeholder="77.2090"></div>
+    <div id="mSiteError" class="error-box hidden"></div>
+    <button class="btn btn-primary" onclick="saveSite(null)" style="margin-top:8px">Add Site</button>
+  `;
+  modal.classList.remove('hidden');
+}
 function openSiteModal(siteId){
   sb.from('site_config').select('*').eq('id',siteId).single().then(({data:s})=>{
     const modal=document.getElementById('modalOverlay');
@@ -1971,6 +1992,7 @@ function openSiteModal(siteId){
   });
 }
 async function saveSite(id){
+  const name=document.getElementById('mSiteName').value.trim();
   const dc=parseFloat(document.getElementById('mSiteDC').value)||null;
   const ac=parseFloat(document.getElementById('mSiteAC').value)||null;
   const inv=parseInt(document.getElementById('mSiteInv').value)||null;
@@ -1980,10 +2002,20 @@ async function saveSite(id){
   const lat=parseFloat(document.getElementById('mSiteLat').value)||null;
   const lng=parseFloat(document.getElementById('mSiteLng').value)||null;
   const errEl=document.getElementById('mSiteError');
-  const{error}=await sb.from('site_config').update({
-    dc_capacity_kw:dc,ac_capacity_kw:ac,inverter_count:inv,strings_per_inv:strs,
-    latitude:lat,longitude:lng,total_modules:mods
-  }).eq('id',id);
+  errEl.classList.add('hidden');
+  if(!id&&!name){errEl.textContent='Site name is required';errEl.classList.remove('hidden');return;}
+  let error;
+  if(id){
+    ({error}=await sb.from('site_config').update({
+      dc_capacity_kw:dc,ac_capacity_kw:ac,inverter_count:inv,strings_per_inv:strs,
+      latitude:lat,longitude:lng,total_modules:mods
+    }).eq('id',id));
+  } else {
+    ({error}=await sb.from('site_config').insert({
+      site_name:name,dc_capacity_kw:dc,ac_capacity_kw:ac,inverter_count:inv,
+      strings_per_inv:strs,latitude:lat,longitude:lng,total_modules:mods,active:true
+    }));
+  }
   if(error){errEl.textContent='Save failed: '+error.message;errEl.classList.remove('hidden');return;}
   closeModal();await loadSites();showAdminSites();
 }
