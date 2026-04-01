@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SCADA Live Monitor — PM KUSUM</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+  :root {
+    --bg:      #0f172a;
+    --surface: #1e293b;
+    --border:  #334155;
+    --text:    #e2e8f0;
+    --muted:   #94a3b8;
+    --amber:   #f59e0b;
+    --green:   #22c55e;
+    --yellow:  #eab308;
+    --red:     #ef4444;
+    --blue:    #38bdf8;
+    --gray:    #475569;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
+
+  /* ── Header ── */
+  .header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  .header-left { display: flex; align-items: center; gap: 12px; }
+  .logo { font-size: 22px; }
+  .site-title { font-size: 18px; font-weight: 700; color: var(--amber); }
+  .site-select {
+    background: var(--bg); border: 1px solid var(--border); color: var(--text);
+    padding: 6px 10px; border-radius: 6px; font-size: 14px; cursor: pointer;
+  }
+  .header-right { display: flex; align-items: center; gap: 12px; font-size: 13px; color: var(--muted); }
+  .refresh-badge {
+    background: #14532d; color: var(--green); border-radius: 20px;
+    padding: 3px 10px; font-size: 12px; font-weight: 600;
+  }
+  .refresh-badge.stale { background: #451a03; color: var(--yellow); }
+
+  /* ── KPI bar ── */
+  .kpi-bar {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1px;
+    background: var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+  .kpi {
+    background: var(--surface);
+    padding: 14px 20px;
+    text-align: center;
+  }
+  .kpi-label { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin-bottom: 4px; }
+  .kpi-value { font-size: 26px; font-weight: 800; color: var(--amber); line-height: 1; }
+  .kpi-unit  { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  /* ── Main layout ── */
+  .main { padding: 16px; display: flex; flex-direction: column; gap: 20px; }
+
+  /* ── Section header ── */
+  .section-head {
+    font-size: 13px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .08em; color: var(--muted); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .section-head::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  /* ── Inverter grid ── */
+  .inv-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+    gap: 10px;
+  }
+  .inv-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    position: relative;
+  }
+  .inv-card.active  { border-color: #166534; }
+  .inv-card.fault   { border-color: #991b1b; }
+  .inv-card.offline { border-color: var(--border); opacity: .6; }
+  .inv-id { font-size: 13px; font-weight: 700; color: var(--muted); margin-bottom: 8px; }
+  .inv-power { font-size: 22px; font-weight: 800; color: var(--green); }
+  .inv-power.zero { color: var(--gray); }
+  .inv-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .inv-chip {
+    font-size: 11px; padding: 2px 7px; border-radius: 4px;
+    background: #0f172a; color: var(--muted); border: 1px solid var(--border);
+  }
+  .inv-chip.temp { color: var(--yellow); }
+  .inv-chip.pr   { color: var(--blue); }
+  .inv-status-dot {
+    position: absolute; top: 10px; right: 10px;
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--gray);
+  }
+  .inv-status-dot.on  { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .inv-status-dot.err { background: var(--red);   box-shadow: 0 0 6px var(--red); }
+
+  /* ── SMB / String grid ── */
+  .smb-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 12px;
+  }
+  .smb-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .smb-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px;
+    background: #0f172a;
+    border-bottom: 1px solid var(--border);
+  }
+  .smb-id   { font-size: 14px; font-weight: 700; color: var(--amber); }
+  .smb-meta { font-size: 11px; color: var(--muted); }
+  .smb-body { padding: 12px 14px; }
+  .strings-label { font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+  .strings-grid {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 4px;
+  }
+  .str {
+    aspect-ratio: 1;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    font-weight: 700;
+    cursor: default;
+    position: relative;
+  }
+  .str.normal  { background: #14532d; color: var(--green); }
+  .str.low     { background: #422006; color: var(--yellow); }
+  .str.fault   { background: #450a0a; color: var(--red); }
+  .str.night   { background: #1e293b; color: var(--gray); }
+  .str.unused  { background: transparent; }
+  .str[title]:hover::after {
+    content: attr(title);
+    position: absolute; bottom: 110%; left: 50%; transform: translateX(-50%);
+    background: #0f172a; border: 1px solid var(--border);
+    color: var(--text); font-size: 11px; padding: 3px 7px; border-radius: 4px;
+    white-space: nowrap; z-index: 20; font-weight: 400;
+  }
+
+  /* ── Alarm banner ── */
+  .alarm-banner {
+    background: #450a0a; border: 1px solid #991b1b; border-radius: 8px;
+    padding: 12px 16px; color: #fca5a5; font-size: 13px;
+    display: none;
+  }
+  .alarm-banner.visible { display: block; }
+
+  /* ── Skeleton loader ── */
+  .skeleton { background: var(--surface); border-radius: 8px; animation: pulse 1.4s infinite; min-height: 80px; }
+  @keyframes pulse { 0%,100% { opacity: .5; } 50% { opacity: 1; } }
+
+  /* ── Night mode overlay ── */
+  .night-notice {
+    text-align: center; padding: 40px 20px; color: var(--muted);
+    display: none;
+  }
+  .night-notice .moon { font-size: 48px; margin-bottom: 12px; }
+
+  /* ── Footer ── */
+  footer {
+    text-align: center; padding: 20px; font-size: 12px; color: var(--gray);
+    border-top: 1px solid var(--border); margin-top: 20px;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <span class="logo">⚡</span>
+    <div>
+      <div class="site-title" id="siteTitle">Loading…</div>
+      <div style="font-size:12px;color:var(--muted)">PM KUSUM — SCADA Live Monitor</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <select class="site-select" id="siteSelect" onchange="switchSite(this.value)">
+      <option value="Haspur">Haspur</option>
+      <option value="Dausar">Dausar</option>
+      <option value="Pahel">Pahel</option>
+    </select>
+    <div>
+      <div id="lastUpdated" style="font-size:12px">—</div>
+      <div id="nextRefresh" style="font-size:11px;color:var(--gray)">—</div>
+    </div>
+    <div class="refresh-badge" id="refreshBadge">LIVE</div>
+  </div>
+</div>
+
+<div class="kpi-bar" id="kpiBar">
+  <div class="kpi"><div class="kpi-label">Plant Power</div><div class="kpi-value" id="kPower">—</div><div class="kpi-unit">kW</div></div>
+  <div class="kpi"><div class="kpi-label">Energy Today</div><div class="kpi-value" id="kEnergy">—</div><div class="kpi-unit">kWh</div></div>
+  <div class="kpi"><div class="kpi-label">Performance Ratio</div><div class="kpi-value" id="kPR">—</div><div class="kpi-unit">%</div></div>
+  <div class="kpi"><div class="kpi-label">Live Irradiance</div><div class="kpi-value" id="kIrr">—</div><div class="kpi-unit">W/m²</div></div>
+  <div class="kpi"><div class="kpi-label">Irradiance Today</div><div class="kpi-value" id="kIrrDay">—</div><div class="kpi-unit">kWh/m²</div></div>
+  <div class="kpi"><div class="kpi-label">Inverters On</div><div class="kpi-value" id="kInv">—</div><div class="kpi-unit">active</div></div>
+  <div class="kpi"><div class="kpi-label">DC Voltage</div><div class="kpi-value" id="kDC">—</div><div class="kpi-unit">V avg</div></div>
+</div>
+
+<div class="main">
+  <div class="alarm-banner" id="alarmBanner"></div>
+  <div class="night-notice" id="nightNotice"><div class="moon">🌙</div><div>Low irradiance — plant not generating</div></div>
+
+  <div>
+    <div class="section-head">Inverter Status</div>
+    <div class="inv-grid" id="invGrid"><div class="skeleton"></div></div>
+  </div>
+
+  <div>
+    <div class="section-head">String Live Status (SMB)</div>
+    <div class="smb-grid" id="smbGrid"><div class="skeleton"></div></div>
+  </div>
+</div>
+
+<footer>Data refreshes every 5 minutes from Suryalog SCADA &nbsp;·&nbsp; PM KUSUM Solar &nbsp;·&nbsp; Read-only view</footer>
+
+<script>
+const SUPABASE_URL  = 'https://yvlagovdcxwmfkefdrnv.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl2bGFnb3ZkY3h3bWZrZWZkcm52Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM0ODc3ODQsImV4cCI6MjA4OTA2Mzc4NH0.uYH7pcSo-pi_ksVMTCWsTiLz5hlt5YZMaVuBRLQvlQ0';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+const REFRESH_INTERVAL = 5 * 60 * 1000; // 5 min
+let currentSite = '';
+let refreshTimer = null;
+let countdownTimer = null;
+let nextRefreshAt = null;
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  const params = new URLSearchParams(location.search);
+  const site = params.get('site') || 'Haspur';
+  document.getElementById('siteSelect').value = site;
+  loadSite(site);
+});
+
+function switchSite(site) {
+  history.replaceState(null, '', `?site=${site}`);
+  loadSite(site);
+}
+
+function loadSite(site) {
+  currentSite = site;
+  document.getElementById('siteTitle').textContent = site;
+  document.title = `${site} — SCADA Monitor`;
+  clearInterval(refreshTimer);
+  clearInterval(countdownTimer);
+  fetchData();
+  scheduleRefresh();
+}
+
+function scheduleRefresh() {
+  nextRefreshAt = Date.now() + REFRESH_INTERVAL;
+  refreshTimer  = setInterval(() => { fetchData(); nextRefreshAt = Date.now() + REFRESH_INTERVAL; }, REFRESH_INTERVAL);
+  countdownTimer = setInterval(updateCountdown, 1000);
+}
+
+function updateCountdown() {
+  const secs = Math.max(0, Math.round((nextRefreshAt - Date.now()) / 1000));
+  document.getElementById('nextRefresh').textContent = `Next refresh in ${secs}s`;
+}
+
+// ── Fetch all data for site ───────────────────────────────────────────────────
+async function fetchData() {
+  try {
+    const [snapRow, meters, inverters, smbs, weather, alarms] = await Promise.all([
+      sb.from('scada_snapshots').select('device_timestamp').eq('site_name', currentSite)
+        .order('device_timestamp', { ascending: false }).limit(1).maybeSingle(),
+      sb.from('scada_meter_readings').select('*').eq('site_name', currentSite).eq('meter_type', 'SM')
+        .order('device_timestamp', { ascending: false }).limit(1).maybeSingle(),
+      sb.from('scada_inverter_readings').select('*').eq('site_name', currentSite)
+        .order('device_timestamp', { ascending: false }).limit(20),
+      sb.from('scada_smb_readings').select('*').eq('site_name', currentSite)
+        .order('device_timestamp', { ascending: false }).limit(20),
+      sb.from('scada_weather_readings').select('*').eq('site_name', currentSite)
+        .order('device_timestamp', { ascending: false }).limit(1).maybeSingle(),
+      sb.from('scada_alarms').select('*').eq('site_name', currentSite).is('resolved_at', null)
+        .order('detected_at', { ascending: false }).limit(10),
+    ]);
+
+    // Deduplicate to latest snapshot per inverter/smb
+    const latestTs = snapRow.data?.device_timestamp;
+    const invData  = (inverters.data || []).filter(r => r.device_timestamp === latestTs ||
+      isLatestPerDevice(inverters.data, r, 'inverter_id'));
+    const smbData  = (smbs.data || []).filter(r => r.device_timestamp === latestTs ||
+      isLatestPerDevice(smbs.data, r, 'smb_id'));
+
+    renderKPIs(meters.data, weather.data, invData);
+    renderInverters(invData, weather.data?.irradiance_wm2);
+    renderSMBs(smbData, weather.data?.irradiance_wm2);
+    renderAlarms(alarms.data || []);
+    updateTimestamp(latestTs);
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+function isLatestPerDevice(rows, row, idField) {
+  if (!rows) return true;
+  const deviceRows = rows.filter(r => r[idField] === row[idField]);
+  const maxTs = deviceRows.reduce((max, r) => r.device_timestamp > max ? r.device_timestamp : max, '');
+  return row.device_timestamp === maxTs;
+}
+
+// ── KPI bar ───────────────────────────────────────────────────────────────────
+function renderKPIs(meter, weather, invs) {
+  const irr = weather?.irradiance_wm2 ?? 0;
+  const isNight = irr < 50;
+  document.getElementById('nightNotice').style.display = isNight ? 'block' : 'none';
+
+  document.getElementById('kPower').textContent  = meter ? Math.round((meter.total_power_w||0)/1000).toLocaleString() : '—';
+  document.getElementById('kEnergy').textContent = meter ? Math.round(meter.kwh_today||0).toLocaleString() : '—';
+  document.getElementById('kPR').textContent     = meter ? (meter.pr_today_pct||0).toFixed(1) : '—';
+  document.getElementById('kIrr').textContent    = weather ? Math.round(irr) : '—';
+  document.getElementById('kIrrDay').textContent = weather?.day_energy_wh_m2
+    ? (weather.day_energy_wh_m2 / 1000).toFixed(2) : '—';
+
+  const active = invs.filter(i => (i.ac_power_w||0) > 0).length;
+  document.getElementById('kInv').textContent = invs.length ? `${active}/${invs.length}` : '—';
+
+  const avgDC = invs.length ? (invs.reduce((s,i) => s + (i.dc_voltage_v||0), 0) / invs.length).toFixed(0) : '—';
+  document.getElementById('kDC').textContent = avgDC;
+}
+
+// ── Inverter cards ────────────────────────────────────────────────────────────
+function renderInverters(invs, irr) {
+  const grid = document.getElementById('invGrid');
+  if (!invs.length) { grid.innerHTML = '<p style="color:var(--muted);font-size:13px">No inverter data yet.</p>'; return; }
+
+  // Sort by inverter_id numerically
+  invs = [...invs].sort((a,b) => natSort(a.inverter_id, b.inverter_id));
+
+  grid.innerHTML = invs.map(inv => {
+    const power  = (inv.ac_power_w || 0) / 1000;
+    const isOn   = power > 0;
+    const isErr  = (inv.alarm1||0) || (inv.alarm2||0) || (inv.error1||0) || (inv.error2||0);
+    const cls    = isErr ? 'fault' : isOn ? 'active' : 'offline';
+    const dotCls = isErr ? 'err'   : isOn ? 'on'    : '';
+
+    return `<div class="inv-card ${cls}">
+      <div class="inv-status-dot ${dotCls}"></div>
+      <div class="inv-id">${inv.inverter_id}</div>
+      <div class="inv-power ${isOn?'':' zero'}">${isOn ? power.toFixed(1) : '—'} <span style="font-size:14px;font-weight:400;color:var(--muted)">kW</span></div>
+      <div class="inv-meta">
+        ${inv.pr_today_pct != null ? `<span class="inv-chip pr">PR ${parseFloat(inv.pr_today_pct).toFixed(1)}%</span>` : ''}
+        ${inv.temp_internal_c ? `<span class="inv-chip temp">${inv.temp_internal_c}°C</span>` : ''}
+        ${inv.dc_voltage_v    ? `<span class="inv-chip">${Math.round(inv.dc_voltage_v)}V DC</span>` : ''}
+        ${inv.kwh_today != null ? `<span class="inv-chip">${parseFloat(inv.kwh_today).toFixed(1)} kWh</span>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── SMB string cards ──────────────────────────────────────────────────────────
+function renderSMBs(smbs, irr) {
+  const grid = document.getElementById('smbGrid');
+  if (!smbs.length) { grid.innerHTML = '<p style="color:var(--muted);font-size:13px">No SMB data yet.</p>'; return; }
+
+  smbs = [...smbs].sort((a,b) => natSort(a.smb_id, b.smb_id));
+  const isNight = (irr || 0) < 50;
+
+  grid.innerHTML = smbs.map(smb => {
+    const sc = smb.string_currents || {};
+    // Build string indicators for I1–I32
+    const strings = [];
+    for (let i = 1; i <= 32; i++) {
+      const key = `I${i}`;
+      if (!(key in sc)) { strings.push(`<div class="str unused"></div>`); continue; }
+      const val = sc[key];
+      let cls = 'night', title = `${key}: ${val}A`;
+      if (isNight) {
+        cls = 'night';
+      } else if (val === 0 || val < 0) {
+        cls = 'fault';
+      } else if (val < 0.5) {
+        cls = 'low';
+      } else {
+        cls = 'normal';
+      }
+      strings.push(`<div class="str ${cls}" title="${title}">${i}</div>`);
+    }
+
+    const hasAlarm = (smb.alarm1||0)||(smb.alarm2||0)||(smb.error1||0)||(smb.error2||0);
+    return `<div class="smb-card">
+      <div class="smb-head">
+        <div>
+          <div class="smb-id">${smb.smb_id} ${hasAlarm ? '⚠️' : ''}</div>
+          <div class="smb-meta">${smb.voltage_v ? smb.voltage_v.toFixed(1)+'V' : '—'} &nbsp;|&nbsp; ${smb.current_total_a != null ? smb.current_total_a.toFixed(2)+'A total' : '—'}</div>
+        </div>
+        <div class="smb-meta" style="text-align:right">
+          ${smb.energy_wh ? (smb.energy_wh/1000).toFixed(1)+' kWh' : '—'}
+        </div>
+      </div>
+      <div class="smb-body">
+        <div class="strings-label">String currents (A) — ${isNight ? '🌙 Low irradiance' : 'Live'}</div>
+        <div class="strings-grid">${strings.join('')}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── Alarms ────────────────────────────────────────────────────────────────────
+function renderAlarms(alarms) {
+  const banner = document.getElementById('alarmBanner');
+  if (!alarms.length) { banner.classList.remove('visible'); return; }
+  banner.classList.add('visible');
+  banner.innerHTML = `⚠️ <strong>${alarms.length} active alarm${alarms.length>1?'s':''}</strong>: ` +
+    alarms.map(a => `${a.device_type} ${a.device_id} — ${a.alarm_field} (${a.alarm_value})`).join(' &nbsp;|&nbsp; ');
+}
+
+// ── Timestamp ─────────────────────────────────────────────────────────────────
+function updateTimestamp(ts) {
+  const el = document.getElementById('lastUpdated');
+  const badge = document.getElementById('refreshBadge');
+  if (!ts) { el.textContent = 'No data'; return; }
+
+  const d   = new Date(ts);
+  const now = new Date();
+  const mins = Math.round((now - d) / 60000);
+  el.textContent = `Updated ${mins <= 1 ? 'just now' : mins + 'm ago'} · ${d.toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit'})} IST`;
+
+  if (mins > 10) {
+    badge.textContent = 'STALE';
+    badge.classList.add('stale');
+  } else {
+    badge.textContent = 'LIVE';
+    badge.classList.remove('stale');
+  }
+}
+
+function natSort(a, b) {
+  return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+}
+</script>
+</body>
+</html>
