@@ -288,43 +288,37 @@ function updateCountdown() {
 // ── Fetch all data for site ───────────────────────────────────────────────────
 async function fetchData() {
   try {
-    const [snapRow, meters, inverters, smbs, weather, alarms] = await Promise.all([
-      sb.from('scada_snapshots').select('device_timestamp').eq('site_name', currentSite)
-        .order('device_timestamp', { ascending: false }).limit(1).maybeSingle(),
-      sb.from('scada_meter_readings').select('*').eq('site_name', currentSite).eq('meter_type', 'SM')
-        .order('device_timestamp', { ascending: false }).limit(1).maybeSingle(),
-      sb.from('scada_inverter_readings').select('*').eq('site_name', currentSite)
-        .order('device_timestamp', { ascending: false }).limit(20),
-      sb.from('scada_smb_readings').select('*').eq('site_name', currentSite)
-        .order('device_timestamp', { ascending: false }).limit(20),
-      sb.from('scada_weather_readings').select('*').eq('site_name', currentSite)
-        .order('device_timestamp', { ascending: false }).limit(1).maybeSingle(),
+    // Step 1: get latest snapshot for this site
+    const { data: snap } = await sb.from('scada_snapshots')
+      .select('id, device_timestamp')
+      .eq('site_name', currentSite)
+      .order('device_timestamp', { ascending: false })
+      .limit(1).maybeSingle();
+
+    if (!snap) {
+      document.getElementById('invGrid').innerHTML = '<p style="color:var(--muted);font-size:13px">No data yet for this site.</p>';
+      document.getElementById('smbGrid').innerHTML = '';
+      return;
+    }
+
+    // Step 2: fetch all child tables by snapshot_id
+    const [meters, inverters, smbs, weather, alarms] = await Promise.all([
+      sb.from('scada_meter_readings').select('*').eq('snapshot_id', snap.id).eq('meter_type', 'SM').maybeSingle(),
+      sb.from('scada_inverter_readings').select('*').eq('snapshot_id', snap.id).order('inverter_id'),
+      sb.from('scada_smb_readings').select('*').eq('snapshot_id', snap.id).order('smb_id'),
+      sb.from('scada_weather_readings').select('*').eq('snapshot_id', snap.id).maybeSingle(),
       sb.from('scada_alarms').select('*').eq('site_name', currentSite).is('resolved_at', null)
         .order('detected_at', { ascending: false }).limit(10),
     ]);
 
-    // Deduplicate to latest snapshot per inverter/smb
-    const latestTs = snapRow.data?.device_timestamp;
-    const invData  = (inverters.data || []).filter(r => r.device_timestamp === latestTs ||
-      isLatestPerDevice(inverters.data, r, 'inverter_id'));
-    const smbData  = (smbs.data || []).filter(r => r.device_timestamp === latestTs ||
-      isLatestPerDevice(smbs.data, r, 'smb_id'));
-
-    renderKPIs(meters.data, weather.data, invData);
-    renderInverters(invData, weather.data?.irradiance_wm2);
-    renderSMBs(smbData, weather.data?.irradiance_wm2);
+    renderKPIs(meters.data, weather.data, inverters.data || []);
+    renderInverters(inverters.data || [], weather.data?.irradiance_wm2);
+    renderSMBs(smbs.data || [], weather.data?.irradiance_wm2);
     renderAlarms(alarms.data || []);
-    updateTimestamp(latestTs);
+    updateTimestamp(snap.device_timestamp);
   } catch (e) {
     console.error(e);
   }
-}
-
-function isLatestPerDevice(rows, row, idField) {
-  if (!rows) return true;
-  const deviceRows = rows.filter(r => r[idField] === row[idField]);
-  const maxTs = deviceRows.reduce((max, r) => r.device_timestamp > max ? r.device_timestamp : max, '');
-  return row.device_timestamp === maxTs;
 }
 
 // ── KPI bar ───────────────────────────────────────────────────────────────────
@@ -333,7 +327,7 @@ function renderKPIs(meter, weather, invs) {
   const isNight = irr < 50;
   document.getElementById('nightNotice').style.display = isNight ? 'block' : 'none';
 
-  document.getElementById('kPower').textContent  = meter ? Math.round((meter.total_power_w||0)/1000).toLocaleString() : '—';
+  document.getElementById('kPower').textContent  = meter ? Math.round((meter.power_w||0)/1000).toLocaleString() : '—';
   document.getElementById('kEnergy').textContent = meter ? Math.round(meter.kwh_today||0).toLocaleString() : '—';
   document.getElementById('kPR').textContent     = meter ? (meter.pr_today_pct||0).toFixed(1) : '—';
   document.getElementById('kIrr').textContent    = weather ? Math.round(irr) : '—';
