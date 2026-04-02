@@ -292,7 +292,8 @@ async function fetchData() {
     const { data: snap } = await sb.from('scada_snapshots')
       .select('id, device_timestamp')
       .eq('site_name', currentSite)
-      .order('device_timestamp', { ascending: false })
+      .not('device_timestamp', 'is', null)
+      .order('fetched_at', { ascending: false })
       .limit(1).maybeSingle();
 
     if (!snap) {
