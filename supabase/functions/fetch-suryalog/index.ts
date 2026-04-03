@@ -178,8 +178,8 @@ async function processSite(
       dc_power_w:      inv.DC_W  ?? null,
       dc_voltage_v:    inv.DC_V  ?? null,
       dc_current_a:    inv.DC_I  ?? null,
-      kwh_today:       inv.WHDay  != null ? inv.WHDay  / 1000 : null,
-      kwh_lifetime:    inv.WHTot  != null ? inv.WHTot  / 1000 : null,
+      kwh_today:       pf(inv.WHDay),   // WHDay is already in kWh (not Wh)
+      kwh_lifetime:    pf(inv.WHTot),   // WHTot is already in kWh (not Wh)
       pr_today_pct:    pf(inv.Day_PR),
       temp_internal_c: inv.TEMP_INT ?? null,
       run_hours:       inv.RUN_HOURS ?? null,
