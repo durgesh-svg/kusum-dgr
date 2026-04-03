@@ -245,7 +245,7 @@ const SUPABASE_URL  = 'https://yvlagovdcxwmfkefdrnv.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl2bGFnb3ZkY3h3bWZrZWZkcm52Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM0ODc3ODQsImV4cCI6MjA4OTA2Mzc4NH0.uYH7pcSo-pi_ksVMTCWsTiLz5hlt5YZMaVuBRLQvlQ0';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
-const REFRESH_INTERVAL = 5 * 60 * 1000; // 5 min
+const REFRESH_INTERVAL = 1 * 60 * 1000; // 1 min
 let currentSite = '';
 let refreshTimer = null;
 let countdownTimer = null;
