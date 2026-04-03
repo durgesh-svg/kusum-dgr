@@ -86,6 +86,14 @@ async function processSite(
   const deviceTimestamp = new Date(deviceTs * 1000).toISOString();
   const siteData        = result.data[dataKeys[0]];
 
+  // 2b. Skip if this device_timestamp already stored (dedup for 1-min polling)
+  const { count } = await supabase
+    .from('scada_snapshots')
+    .select('id', { count: 'exact', head: true })
+    .eq('site_name', site.site_name)
+    .eq('device_timestamp', deviceTimestamp);
+  if ((count ?? 0) > 0) return { site: site.site_name, ok: true, skipped: true };
+
   // 3. Storage path per site
   const now = new Date();
   const pad = (n: number) => String(n).padStart(2, '0');
