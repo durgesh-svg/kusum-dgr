@@ -365,7 +365,8 @@ function renderInverters(invs, irr) {
         ${inv.pr_today_pct != null ? `<span class="inv-chip pr">PR ${parseFloat(inv.pr_today_pct).toFixed(1)}%</span>` : ''}
         ${inv.temp_internal_c ? `<span class="inv-chip temp">${inv.temp_internal_c}°C</span>` : ''}
         ${inv.dc_voltage_v    ? `<span class="inv-chip">${Math.round(inv.dc_voltage_v)}V DC</span>` : ''}
-        ${inv.kwh_today != null ? `<span class="inv-chip">${parseFloat(inv.kwh_today).toFixed(1)} kWh</span>` : ''}
+        ${inv.kwh_today    != null ? `<span class="inv-chip" title="Today's generation">${parseFloat(inv.kwh_today).toFixed(0)} kWh</span>` : ''}
+        ${inv.kwh_lifetime != null ? `<span class="inv-chip" style="color:var(--blue)" title="Lifetime generation">${(parseFloat(inv.kwh_lifetime)/1000).toFixed(1)} MWh ∑</span>` : ''}
       </div>
     </div>`;
   }).join('');
