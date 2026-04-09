@@ -358,6 +358,7 @@ label{display:block;font-size:10px;color:var(--text-muted);font-weight:500;margi
   <div id="screenApprovals" class="screen screen-padded hidden"></div>
   <div id="screenAdmin" class="screen screen-padded hidden"></div>
 </div>
+<input type="file" id="dgrHistCsvInput" accept=".csv" class="hidden" onchange="handleDgrHistCSV(event)">
 <div id="navBar" class="nav-bar hidden">
   <button class="btn btn-secondary" id="btnBack" onclick="goBack()" style="padding:10px 16px">← Back</button>
   <button class="btn btn-primary" id="btnNext" onclick="goNext()" style="flex:1">Next</button>
@@ -1749,6 +1750,7 @@ function showAdmin(){
       <div class="admin-tab${adminTab==='approvals'?' active':''}" onclick="adminTab='approvals';showAdmin()">Approvals</div>
       <div class="admin-tab${adminTab==='settings'?' active':''}" onclick="adminTab='settings';showAdmin()">Settings</div>
       <div class="admin-tab${adminTab==='weather'?' active':''}" onclick="adminTab='weather';showAdmin()">Weather</div>
+      <div class="admin-tab${adminTab==='import'?' active':''}" onclick="adminTab='import';showAdmin()">Import</div>
     </div>
     <div id="adminContent"></div>
   `;
@@ -1757,6 +1759,7 @@ function showAdmin(){
   else if(adminTab==='approvals'){approvalFilter='pending';showApprovalInAdmin();}
   else if(adminTab==='settings')showAdminSettings();
   else if(adminTab==='weather')showWeatherAudit();
+  else if(adminTab==='import')showAdminImport();
 }
 
 async function showAdminUsers(){
@@ -2129,6 +2132,139 @@ async function runWeatherAudit(){
       </div>`;
   }catch(e){resultEl.innerHTML='<div class="error-box">Error: '+e.message+'</div>';}
 }
+
+// ─── ADMIN: HISTORICAL IMPORT ────────────────────────────────────────────────
+function showAdminImport(){
+  const el=document.getElementById('adminContent');
+  el.innerHTML=`
+    <div class="card">
+      <div class="card-title">DGR Historical Import</div>
+      <div style="font-size:11px;color:var(--gray);margin-bottom:10px;line-height:1.6">
+        Upload past DGR data in bulk via CSV. Each row = one site × one date.<br>
+        All uploaded records are marked <span class="badge badge-green" style="font-size:9px">approved</span> automatically.<br>
+        Re-uploading the same site + date safely overwrites (no duplicates).
+      </div>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-secondary" style="flex:1;padding:8px;font-size:11px" onclick="downloadDgrHistTemplate()">⬇ Download Template</button>
+        <button class="btn btn-primary" style="flex:1;padding:8px;font-size:11px" onclick="document.getElementById('dgrHistCsvInput').click()">⬆ Upload CSV</button>
+      </div>
+    </div>
+    <div id="dgrHistResult"></div>`;
+}
+
+function downloadDgrHistTemplate(){
+  const siteNames=(sites||[]).map(s=>s.site_name);
+  const ex1=siteNames[0]||'Bidasar';
+  const ex2=siteNames[1]||'Badsar';
+  const rows=[
+    ['site_name','report_date','submitted_by_name','total_gen_kwh','inv_gen','dc_capacity_kw','ac_capacity_kw','peak_radiation_wm2','poa_kwh_m2','peak_power_kwh','dc_cuf_pct','ac_cuf_pct','pr_pct','grid_outage','plant_outage','wti_c','oti_c','weather','rain','modules_cleaned_today','modules_total','daily_activity','remarks'],
+    [ex1,'2026-01-01','Ramesh Kumar','4250','210|208|212|205|209|211|207|210|208|210','2000','1800','850','5.2','1800','0.15','0.21','78.5','FALSE','FALSE','72','68','Sunny','FALSE','120','3500','Routine cleaning','All normal'],
+    [ex2,'2026-01-01','Suresh Singh','2100','','1000','900','820','4.9','880','','','75.2','FALSE','TRUE','74','71','Hazy','FALSE','','','','Inverter 3 trip - resolved'],
+    ['# INSTRUCTIONS:','','','','','','','','','','','','','','','','','','','','','',''],
+    ['# site_name: must match exactly as shown below','','','','','','','','','','','','','','','','','','','','','',''],
+    ['# report_date: YYYY-MM-DD format only','','','','','','','','','','','','','','','','','','','','','',''],
+    ['# inv_gen: pipe-separated kWh per inverter e.g. 210|208|212','','','','','','','','','','','','','','','','','','','','','',''],
+    ['# dc_capacity_kw / ac_capacity_kw: leave blank to auto-fill from site config','','','','','','','','','','','','','','','','','','','','','',''],
+    ['# grid_outage / plant_outage / rain: TRUE or FALSE','','','','','','','','','','','','','','','','','','','','','',''],
+    ['# weather: Sunny / Cloudy / Hazy / Rainy','','','','','','','','','','','','','','','','','','','','','',''],
+    ['# AVAILABLE SITES:','','','','','','','','','','','','','','','','','','','','','',''],
+    ...siteNames.map(s=>([`# ${s}`,'','','','','','','','','','','','','','','','','','','','','','']))
+  ];
+  const csv=rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const a=document.createElement('a');
+  a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
+  a.download='dgr_historical_template.csv';
+  a.click();
+}
+
+async function handleDgrHistCSV(e){
+  const file=e.target.files[0];if(!file)return;
+  const resultEl=document.getElementById('dgrHistResult');
+  if(!resultEl)return;
+  resultEl.innerHTML='<div class="card" style="text-align:center;color:var(--gray);padding:12px">Parsing CSV...</div>';
+  const text=await file.text();
+  const allLines=text.trim().split('\n');
+  // strip comment lines and blank lines, keep header + data
+  const lines=allLines.filter(l=>!l.trim().startsWith('#')&&l.trim()!=='');
+  if(lines.length<2){resultEl.innerHTML='<div class="error-box">No data rows found</div>';e.target.value='';return;}
+  // parse header
+  const parseFields=line=>{const r=[];let cur='',inQ=false;for(const c of line+','){if(c==='"'){inQ=!inQ;}else if(c===','&&!inQ){r.push(cur.trim().replace(/^"|"$/g,''));cur='';}else cur+=c;}return r;};
+  const headers=parseFields(lines[0]).map(h=>h.toLowerCase().replace(/\s+/g,'_'));
+  const col=k=>headers.indexOf(k);
+  // build site lookup map
+  const siteMap={};(sites||[]).forEach(s=>{siteMap[s.site_name]=s;});
+  const toBool=v=>['true','yes','1'].includes((v||'').toLowerCase());
+  const toNum=v=>v===''||v===undefined?null:parseFloat(v)||null;
+  const rows=[];const errors=[];
+  for(let i=1;i<lines.length;i++){
+    const f=parseFields(lines[i]);
+    const get=k=>col(k)>=0?(f[col(k)]||'').trim():'';
+    const siteName=get('site_name');
+    const reportDate=get('report_date');
+    if(!siteName){errors.push(`Row ${i+1}: site_name is required`);continue;}
+    if(!siteMap[siteName]){errors.push(`Row ${i+1}: site "${siteName}" not found in site config`);continue;}
+    if(!reportDate||!/^\d{4}-\d{2}-\d{2}$/.test(reportDate)){errors.push(`Row ${i+1}: report_date must be YYYY-MM-DD`);continue;}
+    const site=siteMap[siteName];
+    const invRaw=get('inv_gen');
+    const invGen=invRaw?invRaw.split('|').map(v=>parseFloat(v.trim())).filter(n=>!isNaN(n)):null;
+    rows.push({
+      site_name:siteName,
+      report_date:reportDate,
+      submitted_by_name:get('submitted_by_name')||'Historical Upload',
+      submitted_by_phone:session.phone,
+      dc_capacity_kw:toNum(get('dc_capacity_kw'))||site.dc_capacity_kw||null,
+      ac_capacity_kw:toNum(get('ac_capacity_kw'))||site.ac_capacity_kw||null,
+      total_gen_kwh:toNum(get('total_gen_kwh')),
+      inv_gen:invGen,
+      peak_radiation_wm2:toNum(get('peak_radiation_wm2')),
+      poa_kwh_m2:toNum(get('poa_kwh_m2')),
+      peak_power_kwh:toNum(get('peak_power_kwh')),
+      dc_cuf_pct:toNum(get('dc_cuf_pct')),
+      ac_cuf_pct:toNum(get('ac_cuf_pct')),
+      pr_pct:toNum(get('pr_pct')),
+      grid_outage:toBool(get('grid_outage')),
+      plant_outage:toBool(get('plant_outage')),
+      wti_c:toNum(get('wti_c')),
+      oti_c:toNum(get('oti_c')),
+      weather:get('weather')||null,
+      rain:toBool(get('rain')),
+      modules_cleaned_today:toNum(get('modules_cleaned_today')),
+      modules_total:toNum(get('modules_total'))||site.total_modules||null,
+      daily_activity:get('daily_activity')||null,
+      remarks:get('remarks')||'',
+      status:'approved',
+      image_urls:null,
+      grid_outage_details:null,
+      plant_outage_details:null,
+      inv_modules_cleaned:null,
+      weather_auto:null,
+      inv_strings:site.strings_per_inv||null,
+      synced_to_sheet:false,
+    });
+  }
+  if(rows.length===0){
+    resultEl.innerHTML=`<div class="error-box">No valid rows to import.<br>${errors.map(e=>`• ${e}`).join('<br>')}</div>`;
+    e.target.value='';return;
+  }
+  resultEl.innerHTML=`<div class="card" style="text-align:center;color:var(--gray);padding:12px">Uploading ${rows.length} row(s)...</div>`;
+  // upsert in batches of 50
+  const BATCH=50;let imported=0;
+  for(let i=0;i<rows.length;i+=BATCH){
+    const batch=rows.slice(i,i+BATCH);
+    const{error}=await sb.from('dgr_submissions').upsert(batch,{onConflict:'site_name,report_date'});
+    if(error){errors.push(`Batch ${Math.floor(i/BATCH)+1}: ${error.message}`);}
+    else{imported+=batch.length;}
+  }
+  const errHtml=errors.length?`<div style="margin-top:8px;font-size:10px;color:var(--red)">${errors.map(e=>`• ${e}`).join('<br>')}</div>`:'';
+  resultEl.innerHTML=`
+    <div class="card" style="background:var(--green-light);border-color:var(--green-border)">
+      <div style="font-size:13px;font-weight:700;color:var(--green-dark)">✓ ${imported} row(s) imported</div>
+      ${errors.length?`<div style="font-size:11px;color:var(--gray);margin-top:2px">${errors.length} error(s)</div>`:''}
+      ${errHtml}
+    </div>`;
+  e.target.value='';
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 // VIEW SUBMISSION SUMMARY
 async function viewSubmission(id){
