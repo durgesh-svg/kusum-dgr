@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Annual Performance Appraisal</title>
+<style>
+:root{--bg:#fff;--bg2:#f7f7f5;--bg3:#f0efe9;--text:#1a1a18;--text2:#6b6b67;--text3:#a0a09c;--border:rgba(0,0,0,0.1);--border2:rgba(0,0,0,0.18);--r:8px;--rl:12px;--blue-bg:#E6F1FB;--blue-t:#0C447C;--blue-b:#85B7EB;--teal-bg:#E1F5EE;--teal-t:#0F6E56;--teal-b:#5DCAA5;--amber-bg:#FAEEDA;--amber-t:#854F0B;--amber-b:#EF9F27;--red-bg:#FCEBEB;--red-t:#A32D2D;--red-b:#F09595;--green-bg:#EAF3DE;--green-t:#3B6D11;--green-b:#97C459;--purple-bg:#EEEDFE;--purple-t:#3C3489;--purple-b:#AFA9EC}
+@media(prefers-color-scheme:dark){:root{--bg:#1c1c1a;--bg2:#252522;--bg3:#2a2a27;--text:#f0efe8;--text2:#9a9a94;--text3:#6a6a64;--border:rgba(255,255,255,0.1);--border2:rgba(255,255,255,0.18);--blue-bg:#0c2540;--blue-t:#85B7EB;--teal-bg:#04241c;--teal-t:#5DCAA5;--amber-bg:#2a1c06;--amber-t:#FAC775;--red-bg:#2a0c0c;--red-t:#F09595;--green-bg:#142008;--green-t:#97C459;--purple-bg:#1a1840;--purple-t:#AFA9EC}}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg3);color:var(--text);font-size:14px;line-height:1.5;min-height:100vh}
+.hdr{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5rem;display:flex;align-items:center;justify-content:space-between;height:52px;position:sticky;top:0;z-index:100}
+.logo{font-size:15px;font-weight:600}.logo span{font-weight:400;color:var(--text2)}
+.hdr-meta{font-size:12px;color:var(--text2)}
+.layout{display:flex;min-height:calc(100vh - 52px)}
+.sb{width:208px;flex-shrink:0;background:var(--bg);border-right:.5px solid var(--border);padding:1.2rem 0;position:sticky;top:52px;height:calc(100vh - 52px);overflow-y:auto}
+.sb-sec{margin-bottom:1.2rem}
+.sb-lbl{font-size:10px;color:var(--text3);font-weight:600;padding:0 1rem;margin-bottom:4px;letter-spacing:.06em;text-transform:uppercase}
+.sb-item{display:flex;align-items:center;gap:8px;padding:7px 1rem;cursor:pointer;font-size:13px;color:var(--text2);border-left:2px solid transparent;transition:background .1s}
+.sb-item:hover{background:var(--bg2)}.sb-item.active{background:var(--bg2);color:var(--text);border-left-color:var(--text)}
+.dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;background:var(--border2)}.dot.done{background:#5DCAA5}.dot.on{background:#378ADD}
+.main{flex:1;padding:1.6rem 1.4rem 3rem;max-width:780px}
+.page{display:none}.page.active{display:block}
+.pg-title{font-size:20px;font-weight:600;margin-bottom:3px}
+.pg-sub{font-size:13px;color:var(--text2);margin-bottom:1.4rem}
+.chip{font-size:11px;padding:3px 10px;border-radius:20px;font-weight:500;white-space:nowrap}
+.c-warn{background:var(--amber-bg);color:var(--amber-t)}.c-info{background:var(--blue-bg);color:var(--blue-t)}.c-ok{background:var(--green-bg);color:var(--green-t)}.c-done{background:var(--teal-bg);color:var(--teal-t)}.c-pur{background:var(--purple-bg);color:var(--purple-t)}
+.av{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;flex-shrink:0}
+.av-b{background:var(--blue-bg);color:var(--blue-t)}.av-g{background:var(--green-bg);color:var(--green-t)}.av-p{background:var(--purple-bg);color:var(--purple-t)}
+.pcard{display:flex;align-items:center;gap:12px;background:var(--bg);border:.5px solid var(--border);border-radius:var(--rl);padding:.85rem 1.1rem;margin-bottom:1.1rem}
+.pcard-name{font-size:14px;font-weight:500}.pcard-meta{font-size:12px;color:var(--text2);margin-top:2px}
+.hbar{display:flex;align-items:center;background:var(--bg);border:.5px solid var(--border);border-radius:var(--rl);padding:11px 1.1rem;margin-bottom:1.1rem}
+.hn{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:66px}
+.hav{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600}
+.hn-name{font-size:11px;color:var(--text2);text-align:center}.hn-role{font-size:10px;color:var(--text3);text-align:center}
+.hn-st{font-size:10px;padding:2px 6px;border-radius:20px;font-weight:500}
+.hs-a{background:var(--blue-bg);color:var(--blue-t)}.hs-w{background:var(--bg2);color:var(--text3)}.hs-d{background:var(--teal-bg);color:var(--teal-t)}
+.harr{flex:1;height:1px;background:var(--border2);position:relative;min-width:14px}
+.harr::after{content:"";position:absolute;right:-1px;top:-3px;border-left:6px solid var(--border2);border-top:3px solid transparent;border-bottom:3px solid transparent}
+.dlbar{display:flex;align-items:center;gap:10px;background:var(--amber-bg);border-radius:var(--r);padding:8px 12px;margin-bottom:1.1rem;font-size:13px;flex-wrap:wrap}
+.dlbar b{color:var(--amber-t)}
+.card{background:var(--bg);border:.5px solid var(--border);border-radius:var(--rl);padding:1.1rem;margin-bottom:1rem}
+.card-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:.85rem}
+.card-title{font-size:14px;font-weight:500}.card-sub{font-size:12px;color:var(--text2)}
+.info{font-size:13px;color:var(--text2);background:var(--bg2);border-radius:var(--r);padding:8px 11px;margin-bottom:1rem;line-height:1.6}
+/* KPI block */
+.kpi-blk{border:.5px solid var(--border);border-radius:var(--r);padding:.9rem;margin-bottom:.7rem;background:var(--bg)}
+.kpi-blk-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:.7rem}
+.kpi-tag{font-size:12px;font-weight:600;color:var(--text2);background:var(--bg2);padding:3px 9px;border-radius:20px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px}
+.full{margin-bottom:8px}
+.fl{font-size:11px;color:var(--text2);margin-bottom:3px;font-weight:500}
+input[type=text],textarea,select{width:100%;padding:7px 9px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--r);background:var(--bg);color:var(--text);font-family:inherit;resize:vertical;transition:border-color .12s}
+input[type=text]:focus,textarea:focus{outline:none;border-color:#378ADD}
+textarea{min-height:50px}
+.ro-box{background:var(--bg2);border-radius:var(--r);padding:7px 10px;font-size:13px;color:var(--text2)}
+/* Rating */
+.rrow{display:flex;gap:4px}
+.rleg{display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-top:3px}
+.rb{width:30px;height:30px;border-radius:var(--r);border:.5px solid var(--border2);background:transparent;font-size:12px;cursor:pointer;color:var(--text2);font-weight:500;font-family:inherit;transition:all .1s}
+.rb:hover{background:var(--bg2)}
+.rb.s1{background:var(--red-bg);color:var(--red-t);border-color:var(--red-b)}.rb.s2{background:var(--amber-bg);color:var(--amber-t);border-color:var(--amber-b)}.rb.s3{background:var(--green-bg);color:var(--green-t);border-color:var(--green-b)}.rb.s4{background:var(--teal-bg);color:var(--teal-t);border-color:var(--teal-b)}.rb.s5{background:var(--blue-bg);color:var(--blue-t);border-color:var(--blue-b)}
+/* Appr notes */
+.an{border-radius:var(--r);padding:7px 10px;font-size:12px;margin-top:6px}
+.an-ok{background:var(--green-bg);color:var(--green-t)}.an-bk{background:var(--amber-bg);color:var(--amber-t)}.an-emp{background:var(--bg2);color:var(--text2);font-style:italic}.an-mgr{background:var(--blue-bg);color:var(--blue-t)}
+.appr-btns{display:flex;gap:6px;margin:7px 0}
+/* Buttons */
+.btn{padding:8px 17px;border-radius:var(--r);font-size:13px;cursor:pointer;font-family:inherit;font-weight:500;transition:all .12s;border:.5px solid var(--border2)}
+.btn-g{background:transparent;color:var(--text2)}.btn-g:hover{background:var(--bg2)}
+.btn-p{background:var(--text);color:var(--bg);border-color:var(--text)}.btn-p:hover{opacity:.85}
+.btn-d{background:transparent;color:var(--red-t);border-color:var(--red-b)}.btn-d:hover{background:var(--red-bg)}
+.btn-sm{padding:5px 10px;font-size:12px}
+.add-btn{display:flex;align-items:center;gap:6px;padding:8px 12px;border:.5px dashed var(--border2);border-radius:var(--r);background:transparent;cursor:pointer;font-size:13px;color:var(--text2);font-family:inherit;margin-top:7px;transition:background .1s}
+.add-btn:hover{background:var(--bg2)}
+.del-btn{width:26px;height:26px;border-radius:var(--r);border:.5px solid var(--border2);background:transparent;cursor:pointer;font-size:12px;color:var(--text2);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .1s}
+.del-btn:hover{background:var(--red-bg);color:var(--red-t);border-color:var(--red-b)}
+.act-row{display:flex;justify-content:space-between;align-items:center;margin-top:1.2rem;flex-wrap:wrap;gap:8px;padding-bottom:2rem}
+/* Summary */
+.sg{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:1rem}
+.sc{background:var(--bg);border:.5px solid var(--border);border-radius:var(--r);padding:10px 12px}
+.sc-lbl{font-size:11px;color:var(--text2);margin-bottom:3px}.sc-val{font-size:22px;font-weight:600}.sc-sub{font-size:10px;color:var(--text3);margin-top:2px}
+/* Rec */
+.rec-g{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin:8px 0}
+.rec-c{background:var(--bg);border:.5px solid var(--border2);border-radius:var(--r);padding:8px 10px;cursor:pointer;transition:all .12s}
+.rec-c:hover{background:var(--bg2)}.rec-c.sel{border:2px solid #639922;background:var(--green-bg)}.rec-c.sel .rc-t{color:var(--green-t)}
+.rc-t{font-size:13px;font-weight:500}.rc-s{font-size:11px;color:var(--text2);margin-top:2px}
+/* RO KPI */
+.ro-kpi{padding:10px 0;border-bottom:.5px solid var(--border)}.ro-kpi:last-child{border-bottom:none}
+.ro-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:4px}
+.ro-name{font-size:14px;font-weight:500}.ro-meta{font-size:12px;color:var(--text2);margin-top:2px}
+.rbadge{font-size:11px;padding:3px 8px;border-radius:var(--r);font-weight:500;white-space:nowrap}
+.rb-e{background:var(--blue-bg);color:var(--blue-t)}.rb-m{background:var(--green-bg);color:var(--green-t)}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--text);color:var(--bg);padding:9px 18px;border-radius:var(--r);font-size:13px;font-weight:500;z-index:999;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.show{opacity:1}
+@media(max-width:580px){.layout{flex-direction:column}.sb{width:100%;height:auto;position:static;border-right:none;border-bottom:.5px solid var(--border);display:flex;flex-wrap:wrap;padding:.4rem;gap:3px}.sb-item{border-radius:var(--r);border-left:none;font-size:12px;padding:5px 8px}.sb-lbl{display:none}.main{padding:.9rem}.g2,.g3{grid-template-columns:1fr}.rec-g{grid-template-columns:1fr 1fr}.sg{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+
+<header class="hdr">
+  <div class="logo">Performance Appraisal <span>Portal</span></div>
+  <div class="hdr-meta">FY 2024–25 · Annual Review</div>
+</header>
+
+<div class="layout">
+  <nav class="sb">
+    <div class="sb-sec">
+      <div class="sb-lbl">Employee</div>
+      <div class="sb-item active" id="nav-p1" onclick="go('p1')"><span class="dot on" id="d-p1"></span>Phase 1 — Set targets</div>
+      <div class="sb-item" id="nav-p2" onclick="go('p2')"><span class="dot" id="d-p2"></span>Phase 2 — Log achievements</div>
+    </div>
+    <div class="sb-sec">
+      <div class="sb-lbl">L1 Manager</div>
+      <div class="sb-item" id="nav-p1b" onclick="go('p1b')"><span class="dot" id="d-p1b"></span>Approve targets</div>
+      <div class="sb-item" id="nav-p3" onclick="go('p3')"><span class="dot" id="d-p3"></span>Phase 3 — Review</div>
+    </div>
+    <div class="sb-sec">
+      <div class="sb-lbl">L2 View</div>
+      <div class="sb-item" id="nav-p4" onclick="go('p4')"><span class="dot" id="d-p4"></span>Portfolio summary</div>
+    </div>
+  </nav>
+
+  <main class="main">
+
+    <!-- P1: Employee sets targets -->
+    <div class="page active" id="page-p1">
+      <div class="pg-title">Phase 1 — Define KPIs &amp; targets</div>
+      <div class="pg-sub">Propose your KPIs for the year. Your manager will review and approve before you can log achievements.</div>
+
+      <div class="hbar">
+        <div class="hn"><div class="hav av-b">RK</div><div class="hn-name">Rajesh Kumar</div><div class="hn-role">Employee</div><div class="hn-st hs-a" id="hs-emp">Active</div></div>
+        <div class="harr"></div>
+        <div class="hn"><div class="hav av-g">AM</div><div class="hn-name">Ankit Mehta</div><div class="hn-role">L1 Manager</div><div class="hn-st hs-w" id="hs-l1">Waiting</div></div>
+        <div class="harr"></div>
+        <div class="hn"><div class="hav av-p">DG</div><div class="hn-name">Durgesh</div><div class="hn-role">L2 Portfolio Head</div><div class="hn-st hs-w" id="hs-l2">Read-only</div></div>
+      </div>
+
+      <div class="dlbar"><b>Employee deadline:</b> 31 March 2025 &nbsp;·&nbsp; 12 days remaining</div>
+
+      <div class="card">
+        <div class="card-hd"><div class="card-title">My KPIs for FY 2024–25</div><div class="card-sub">Add as many as needed</div></div>
+        <div id="kpi-p1"></div>
+        <button class="add-btn" onclick="addKPI()">+ Add KPI</button>
+      </div>
+
+      <div class="card">
+        <div class="card-hd"><div class="card-title">Note to manager</div></div>
+        <div class="fl" style="margin-bottom:4px">Context on how these targets were set</div>
+        <textarea id="emp-ctx" placeholder="e.g. Targets set basis historical performance and OEM SLAs. PLF target aligned to regional GHI data."></textarea>
+      </div>
+
+      <div class="act-row">
+        <button class="btn btn-g" onclick="showToast('Draft saved')">Save draft</button>
+        <button class="btn btn-p" onclick="submitP1()">Submit to manager for approval &rarr;</button>
+      </div>
+    </div>
+
+    <!-- P1b: L1 approves targets -->
+    <div class="page" id="page-p1b">
+      <div class="pg-title">Approve employee KPI targets</div>
+      <div class="pg-sub">Review the proposed KPIs. Approve each or send back with a comment. All must be approved to open Phase 2.</div>
+
+      <div class="pcard">
+        <div class="av av-g">AM</div>
+        <div><div class="pcard-name">Ankit Mehta — reviewing Rajesh Kumar's targets</div><div class="pcard-meta">L1 Manager &nbsp;·&nbsp; Action each KPI below</div></div>
+        <span class="chip c-info" id="l1-chip">Pending action</span>
+      </div>
+
+      <div class="card" id="ctx-card" style="display:none">
+        <div class="card-hd"><div class="card-title">Employee's note</div></div>
+        <div class="ro-box" id="ctx-text"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-hd"><div class="card-title">Proposed KPIs</div><div class="card-sub">Approve or send back individually</div></div>
+        <div id="kpi-p1b"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-hd"><div class="card-title">Overall comment to employee</div></div>
+        <textarea id="l1-note" placeholder="Optional overall note to the employee on their target setting…"></textarea>
+      </div>
+
+      <div class="act-row">
+        <button class="btn btn-d" onclick="sendAllBack()">Send all back</button>
+        <button class="btn btn-p" onclick="approveAll()">Approve all &amp; open Phase 2 &rarr;</button>
+      </div>
+    </div>
+
+    <!-- P2: Employee logs achievements -->
+    <div class="page" id="page-p2">
+      <div class="pg-title">Phase 2 — Log achievements &amp; self-rate</div>
+      <div class="pg-sub">Targets approved. Fill in your actual achievements, add remarks, and self-rate each KPI before the deadline.</div>
+
+      <div class="dlbar"><b>Deadline:</b> 31 March 2025 &nbsp;·&nbsp; Targets approved by Ankit Mehta</div>
+      <div id="l1-note-disp"></div>
+
+      <div class="card">
+        <div class="card-hd"><div class="card-title">KPI achievements &amp; self-rating</div><div class="card-sub">1 = below expectations &nbsp;·&nbsp; 5 = outstanding</div></div>
+        <div id="kpi-p2"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-hd"><div class="card-title">Overall self-reflection</div></div>
+        <div class="g2" style="margin-bottom:8px">
+          <div><div class="fl" style="margin-bottom:4px">Biggest achievement this year</div><textarea placeholder="Your most significant contribution…"></textarea></div>
+          <div><div class="fl" style="margin-bottom:4px">What you would do differently</div><textarea placeholder="Areas you'd handle better…"></textarea></div>
+        </div>
+        <div class="fl" style="margin-bottom:4px">Goals for next year</div>
+        <textarea placeholder="3–5 goals for FY 2025–26…"></textarea>
+      </div>
+
+      <div class="act-row">
+        <button class="btn btn-g" onclick="showToast('Draft saved')">Save draft</button>
+        <button class="btn btn-p" onclick="submitP2()">Submit to manager for review &rarr;</button>
+      </div>
+    </div>
+
+    <!-- P3: L1 review -->
+    <div class="page" id="page-p3">
+      <div class="pg-title">Phase 3 — Manager review</div>
+      <div class="pg-sub">Review the employee's self-assessment. Rate each KPI and provide your overall recommendation.</div>
+
+      <div class="pcard">
+        <div class="av av-g">AM</div>
+        <div><div class="pcard-name">Ankit Mehta — reviewing Rajesh Kumar</div><div class="pcard-meta">L1 Manager &nbsp;·&nbsp; FY 2024–25</div></div>
+        <span class="chip c-info">In review</span>
+      </div>
+
+      <div class="sg">
+        <div class="sc"><div class="sc-lbl">KPIs submitted</div><div class="sc-val" id="m-kc">—</div></div>
+        <div class="sc"><div class="sc-lbl">Avg self-rating</div><div class="sc-val" id="m-sr">—</div><div class="sc-sub">out of 5</div></div>
+        <div class="sc"><div class="sc-lbl">Avg L1 rating</div><div class="sc-val" id="m-l1r">—</div><div class="sc-sub">out of 5</div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-hd"><div class="card-title">KPI-wise review</div><div class="card-sub">Rate each KPI independently</div></div>
+        <div id="kpi-p3"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-hd"><div class="card-title">Overall performance summary</div></div>
+        <div class="fl" style="margin-bottom:4px">Summarise the employee's performance, strengths and areas for improvement</div>
+        <textarea id="mgr-sum" rows="4" placeholder="Overall assessment of the employee's performance this year…" oninput="syncL2()"></textarea>
+      </div>
+
+      <div class="card">
+        <div class="card-hd"><div class="card-title">Recommendation</div></div>
+        <div class="rec-g" id="rec-g">
+          <div class="rec-c" onclick="pickRec(this,'Increment')"><div class="rc-t">Increment</div><div class="rc-s">Standard merit raise</div></div>
+          <div class="rec-c" onclick="pickRec(this,'Exceptional increment')"><div class="rc-t">Exceptional increment</div><div class="rc-s">Top performer</div></div>
+          <div class="rec-c" onclick="pickRec(this,'Promotion')"><div class="rc-t">Promotion</div><div class="rc-s">Role upgrade</div></div>
+          <div class="rec-c" onclick="pickRec(this,'No change')"><div class="rc-t">No change</div><div class="rc-s">Hold current grade</div></div>
+          <div class="rec-c" onclick="pickRec(this,'PIP')"><div class="rc-t">PIP</div><div class="rc-s">Improvement plan</div></div>
+        </div>
+        <div class="fl" style="margin-top:10px;margin-bottom:4px">Recommendation notes</div>
+        <textarea id="rec-notes" placeholder="Details — increment %, promotion timeline, PIP goals, etc." oninput="syncL2()"></textarea>
+      </div>
+
+      <div class="act-row">
+        <button class="btn btn-g" onclick="showToast('Draft saved')">Save draft</button>
+        <button class="btn btn-p" onclick="finalise()">Finalise &amp; send to L2 &rarr;</button>
+      </div>
+    </div>
+
+    <!-- P4: L2 read-only -->
+    <div class="page" id="page-p4">
+      <div class="pg-title">Portfolio summary — L2 view</div>
+      <div class="pg-sub">Completed appraisal for Rajesh Kumar. Read-only — managed by L1 Ankit Mehta.</div>
+
+      <div class="pcard">
+        <div class="av av-p">DG</div>
+        <div><div class="pcard-name">Durgesh — Portfolio Head (L2)</div><div class="pcard-meta">Read-only appraisal summary &nbsp;·&nbsp; FY 2024–25</div></div>
+        <span class="chip c-pur" id="l2-chip">Awaiting completion</span>
+      </div>
+
+      <div class="sg">
+        <div class="sc"><div class="sc-lbl">KPIs reviewed</div><div class="sc-val" id="l2-kc">—</div></div>
+        <div class="sc"><div class="sc-lbl">Final L1 rating</div><div class="sc-val" id="l2-avg">—</div><div class="sc-sub">out of 5</div></div>
+        <div class="sc"><div class="sc-lbl">Recommendation</div><div class="sc-val" style="font-size:13px;padding-top:6px" id="l2-rec">—</div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-hd"><div class="card-title">KPI summary</div><div class="card-sub">Read-only</div></div>
+        <div id="l2-kpis"><div style="font-size:13px;color:var(--text2);padding:10px 0">Complete Phase 3 to see the final summary.</div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-hd"><div class="card-title">Manager's overall summary</div></div>
+        <div class="ro-box" id="l2-sum">—</div>
+      </div>
+
+      <div class="card">
+        <div class="card-hd"><div class="card-title">Recommendation &amp; notes</div></div>
+        <div class="ro-box" id="l2-rec-notes">—</div>
+      </div>
+
+      <div class="act-row">
+        <span style="font-size:12px;color:var(--text3)">Read-only &nbsp;·&nbsp; L2 view</span>
+        <button class="btn btn-g" onclick="window.print()">Print / Export</button>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<div class="toast" id="t-el"></div>
+
+<script>
+let K=[
+  {name:'',desc:'',target:'',achieved:'',remarks:'',sr:0,approved:null,apNote:'',mr:0,mNote:''},
+  {name:'',desc:'',target:'',achieved:'',remarks:'',sr:0,approved:null,apNote:'',mr:0,mNote:''},
+  {name:'',desc:'',target:'',achieved:'',remarks:'',sr:0,approved:null,apNote:'',mr:0,mNote:''},
+];
+let rec='';
+
+function showToast(m){const e=document.getElementById('t-el');e.textContent=m;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),2400)}
+function go(p){document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.sb-item').forEach(x=>x.classList.remove('active'));document.getElementById('page-'+p).classList.add('active');document.getElementById('nav-'+p).classList.add('active')}
+function setDot(id,s){const e=document.getElementById('d-'+id);if(!e)return;e.className='dot'+(s==='done'?' done':s==='on'?' on':'')}
+function setHS(id,s){const e=document.getElementById('hs-'+id);if(!e)return;e.className='hn-st '+(s==='a'?'hs-a':s==='d'?'hs-d':'hs-w');e.textContent=s==='a'?'Active':s==='d'?'Done':'Waiting'}
+function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+
+function buildP1(){
+  document.getElementById('kpi-p1').innerHTML=K.map((k,i)=>`
+  <div class="kpi-blk">
+    <div class="kpi-blk-hd">
+      <span class="kpi-tag">KPI ${i+1}</span>
+      ${K.length>1?`<button class="del-btn" onclick="delK(${i})">✕</button>`:''}
+    </div>
+    <div class="g2">
+      <div><div class="fl">KPI name</div><input type="text" value="${esc(k.name)}" oninput="K[${i}].name=this.value" placeholder="e.g. Plant availability factor"></div>
+      <div><div class="fl">Target</div><input type="text" value="${esc(k.target)}" oninput="K[${i}].target=this.value" placeholder="e.g. ≥98% monthly average"></div>
+    </div>
+    <div class="full"><div class="fl">Description &amp; how it will be measured</div><textarea oninput="K[${i}].desc=this.value" placeholder="What does this KPI measure? How will it be tracked and verified?">${esc(k.desc)}</textarea></div>
+  </div>`).join('');
+}
+
+function addKPI(){K.push({name:'',desc:'',target:'',achieved:'',remarks:'',sr:0,approved:null,apNote:'',mr:0,mNote:''});buildP1()}
+function delK(i){K.splice(i,1);buildP1()}
+
+function submitP1(){
+  if(K.some(k=>!k.name.trim())){showToast('Please fill in all KPI names first.');return}
+  K.forEach(k=>{k.approved=null;k.apNote=''});
+  const ctx=document.getElementById('emp-ctx').value;
+  const cc=document.getElementById('ctx-card'),ct=document.getElementById('ctx-text');
+  if(ctx){ct.textContent=ctx;cc.style.display='block'}else cc.style.display='none';
+  buildP1b();
+  setDot('p1','done');setHS('l1','a');
+  showToast('Submitted to Ankit Mehta for approval');go('p1b');
+}
+
+function buildP1b(){
+  document.getElementById('kpi-p1b').innerHTML=K.map((k,i)=>{
+    const sl=k.approved===true?'Approved':k.approved===false?'Sent back':'Pending';
+    const sc=k.approved===true?'c-ok':k.approved===false?'c-warn':'c-info';
+    return `<div class="kpi-blk">
+      <div class="kpi-blk-hd"><span class="kpi-tag">KPI ${i+1} — ${esc(k.name)||'Unnamed'}</span><span class="chip ${sc}">${sl}</span></div>
+      <div class="g2">
+        <div><div class="fl">Target</div><div class="ro-box">${esc(k.target)||'—'}</div></div>
+        <div><div class="fl">Description</div><div class="ro-box">${esc(k.desc)||'—'}</div></div>
+      </div>
+      <div class="appr-btns">
+        <button class="btn btn-sm" style="color:var(--green-t);border-color:var(--green-b)" onclick="apprK(${i},true)">Approve</button>
+        <button class="btn btn-sm btn-d" onclick="apprK(${i},false)">Send back</button>
+      </div>
+      <div class="fl" style="margin-bottom:4px">Comment to employee</div>
+      <input type="text" value="${esc(k.apNote)}" oninput="K[${i}].apNote=this.value" placeholder="Optional comment on this KPI…">
+      ${k.approved===true?'<div class="an an-ok" style="margin-top:6px">Approved</div>':k.approved===false?'<div class="an an-bk" style="margin-top:6px">Sent back — employee will see this comment</div>':''}
+    </div>`;
+  }).join('');
+  const allOk=K.every(k=>k.approved===true),allDone=K.every(k=>k.approved!==null);
+  const c=document.getElementById('l1-chip');
+  c.textContent=allOk?'All approved':allDone?'Some sent back':'Pending action';
+  c.className='chip '+(allOk?'c-ok':allDone?'c-warn':'c-info');
+}
+
+function apprK(i,v){K[i].approved=v;buildP1b()}
+function sendAllBack(){K.forEach(k=>k.approved=false);buildP1b();showToast('All KPIs sent back to employee')}
+function approveAll(){
+  K.forEach(k=>{if(k.approved!==false)k.approved=true});
+  if(K.some(k=>k.approved===false)){buildP1b();showToast('Some KPIs sent back. Approve all to continue.');return}
+  const n=document.getElementById('l1-note').value;
+  if(n)document.getElementById('l1-note-disp').innerHTML=`<div class="an an-mgr" style="margin-bottom:1rem"><strong>Note from Ankit Mehta:</strong> ${esc(n)}</div>`;
+  buildP2();setDot('p1b','done');setHS('emp','a');
+  showToast('Targets approved — Phase 2 is now open');go('p2');
+}
+
+function buildP2(){
+  document.getElementById('kpi-p2').innerHTML=K.map((k,i)=>`
+  <div class="kpi-blk">
+    <div class="kpi-blk-hd"><span class="kpi-tag">KPI ${i+1} — ${esc(k.name)}</span></div>
+    <div class="g2">
+      <div><div class="fl">Target (approved)</div><div class="ro-box">${esc(k.target)||'—'}</div></div>
+      <div><div class="fl">Actual achieved</div><input type="text" value="${esc(k.achieved)}" oninput="K[${i}].achieved=this.value" placeholder="What did you actually achieve?"></div>
+    </div>
+    <div class="full"><div class="fl">Remarks</div><textarea oninput="K[${i}].remarks=this.value" placeholder="Explain your result — context, constraints, actions taken…">${esc(k.remarks)}</textarea></div>
+    <div><div class="fl" style="margin-bottom:4px">Self-rating</div>
+    <div class="rrow" id="sr-${i}"></div>
+    <div class="rleg"><span>1 — Below expectations</span><span>5 — Outstanding</span></div></div>
+  </div>`).join('');
+  K.forEach((_,i)=>buildR('sr-'+i,K[i].sr,v=>{K[i].sr=v}));
+}
+
+function buildR(cid,init,cb){
+  const el=document.getElementById(cid);if(!el)return;el.innerHTML='';
+  for(let v=1;v<=5;v++){const b=document.createElement('button');b.className='rb'+(init===v?' s'+v:'');b.textContent=v;b.onclick=(function(val,id,fn){return()=>{fn(val);document.getElementById(id).querySelectorAll('.rb').forEach(x=>x.className='rb'+(+x.textContent===val?' s'+val:''));updMgr();syncL2()}})(v,cid,cb);el.appendChild(b)}}
+
+function submitP2(){buildP3();setDot('p2','done');setHS('emp','d');setHS('l1','a');showToast('Submitted to Ankit Mehta for review');go('p3')}
+
+function buildP3(){
+  const el=document.getElementById('kpi-p3');if(!el)return;
+  el.innerHTML=K.map((k,i)=>`
+  <div class="kpi-blk">
+    <div class="kpi-blk-hd"><span class="kpi-tag">KPI ${i+1} — ${esc(k.name)}</span><span class="rbadge rb-e">Self: ${k.sr||'—'}</span></div>
+    <div class="g3">
+      <div><div class="fl">Target</div><div class="ro-box">${esc(k.target)||'—'}</div></div>
+      <div><div class="fl">Achieved</div><div class="ro-box">${esc(k.achieved)||'—'}</div></div>
+      <div><div class="fl">Employee remarks</div><div class="ro-box">${esc(k.remarks)||'—'}</div></div>
+    </div>
+    <div class="g2" style="margin-top:8px">
+      <div><div class="fl" style="margin-bottom:4px">L1 rating</div><div class="rrow" id="mr-${i}"></div><div class="rleg"><span>1 — Poor</span><span>5 — Outstanding</span></div></div>
+      <div><div class="fl" style="margin-bottom:4px">L1 feedback</div><textarea placeholder="Your assessment of this KPI…" oninput="K[${i}].mNote=this.value;syncL2()">${esc(k.mNote)}</textarea></div>
+    </div>
+  </div>`).join('');
+  K.forEach((_,i)=>buildR('mr-'+i,K[i].mr,v=>{K[i].mr=v;updMgr();syncL2()}));
+  updMgr();document.getElementById('m-kc').textContent=K.length;
+}
+
+function updMgr(){
+  const sr=K.map(k=>k.sr).filter(v=>v>0),mr=K.map(k=>k.mr).filter(v=>v>0);
+  document.getElementById('m-sr').textContent=sr.length?(sr.reduce((a,b)=>a+b,0)/sr.length).toFixed(1):'—';
+  document.getElementById('m-l1r').textContent=mr.length?(mr.reduce((a,b)=>a+b,0)/mr.length).toFixed(1):'—';
+}
+
+function pickRec(el,v){rec=v;document.querySelectorAll('.rec-c').forEach(c=>c.classList.remove('sel'));el.classList.add('sel');syncL2()}
+
+function syncL2(){
+  const mr=K.map(k=>k.mr).filter(v=>v>0);
+  const avg=mr.length?(mr.reduce((a,b)=>a+b,0)/mr.length).toFixed(1):'—';
+  document.getElementById('l2-kc').textContent=K.length;
+  document.getElementById('l2-avg').textContent=avg;
+  document.getElementById('l2-rec').textContent=rec||'—';
+  const s=document.getElementById('mgr-sum');if(s)document.getElementById('l2-sum').textContent=s.value||'—';
+  const r=document.getElementById('rec-notes');if(r)document.getElementById('l2-rec-notes').textContent=r.value||(rec?'Recommendation: '+rec:'—');
+  buildL2();
+}
+
+function buildL2(){
+  const el=document.getElementById('l2-kpis');if(!el||K.length===0)return;
+  el.innerHTML=K.map((k,i)=>`
+  <div class="ro-kpi">
+    <div class="ro-top">
+      <div>
+        <div class="ro-name">KPI ${i+1} — ${esc(k.name)||'Unnamed'}</div>
+        <div class="ro-meta">Target: ${esc(k.target)||'—'} &nbsp;·&nbsp; Achieved: ${esc(k.achieved)||'—'}</div>
+        ${k.remarks?`<div class="ro-meta" style="margin-top:2px">Remarks: ${esc(k.remarks)}</div>`:''}
+      </div>
+      <div style="display:flex;gap:5px;flex-shrink:0">
+        <span class="rbadge rb-e">Self: ${k.sr||'—'}</span>
+        <span class="rbadge rb-m">L1: ${k.mr||'—'}</span>
+      </div>
+    </div>
+  </div>`).join('');
+}
+
+function finalise(){
+  syncL2();setDot('p3','done');setDot('p4','on');setHS('l1','d');setHS('l2','a');
+  document.getElementById('l2-chip').textContent='Finalised';document.getElementById('l2-chip').className='chip c-done';
+  showToast('Appraisal finalised — visible to L2');go('p4');
+}
+
+buildP1();
+</script>
+</body>
+</html>
