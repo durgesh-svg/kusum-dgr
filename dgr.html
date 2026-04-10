@@ -1504,6 +1504,8 @@ async function submitReport(){
     };
     // Remove undefined values
     Object.keys(payload).forEach(k=>{if(payload[k]===undefined)payload[k]=null;});
+    // Save draft to localStorage before network call — protects against connection drops
+    try{localStorage.setItem('dgr_draft',JSON.stringify({payload,savedAt:new Date().toISOString()}));}catch(e){}
     if(navigator.onLine){
       const{error}=await sb.from('dgr_submissions').upsert(payload,{onConflict:'site_name,report_date'});
       if(error){
@@ -1513,10 +1515,17 @@ async function submitReport(){
         return;
       }
     } else await saveOffline(payload);
+    // Clear draft on successful submit
+    try{localStorage.removeItem('dgr_draft');}catch(e){}
     goToScreen(10);
   }catch(e){
     btn.disabled=false;btn.textContent='Submit Report';
-    alert('Error: '+e.message);
+    const isNetworkErr=e.message&&(e.message.includes('fetch')||e.message.includes('network')||e.message.includes('NetworkError'));
+    if(isNetworkErr){
+      alert('Network error — check your signal and tap Submit again.\n\nYour data is saved and ready to retry.');
+    } else {
+      alert('Submit failed: '+e.message+'\n\nContact admin if issue persists.');
+    }
   }
 }
 
