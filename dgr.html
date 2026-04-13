@@ -365,6 +365,22 @@ label{display:block;font-size:10px;color:var(--text-muted);font-weight:500;margi
 </div>
 <div id="bottomTabs" class="bottom-tabs hidden"></div>
 </div>
+<!-- RESET PASSWORD MODAL -->
+<div id="resetPwModal" class="modal-overlay hidden" onclick="if(event.target===this)this.classList.add('hidden')">
+  <div class="modal-content" style="max-width:340px" onclick="event.stopPropagation()">
+    <div class="modal-header"><div class="modal-title">Reset Password</div><button class="modal-close" onclick="document.getElementById('resetPwModal').classList.add('hidden')">✕</button></div>
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">User: <strong id="resetPwUserLabel"></strong></div>
+    <input type="hidden" id="resetPwUserId">
+    <div class="modal-field"><label>Temporary password</label>
+      <div class="pw-wrap"><input type="password" id="resetPwInput" placeholder="Min 8 characters"><button class="pw-toggle" onclick="togglePw('resetPwInput',this)">👁</button></div>
+    </div>
+    <div id="resetPwError" class="error-box hidden"></div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('resetPwModal').classList.add('hidden')">Cancel</button>
+      <button class="btn btn-primary" style="flex:1" onclick="doAdminResetPw()">Reset Password</button>
+    </div>
+  </div>
+</div>
 <!-- MODAL -->
 <div id="modalOverlay" class="modal-overlay hidden" onclick="closeModal(event)">
   <div class="modal-content" id="modalContent" onclick="event.stopPropagation()"></div>
@@ -1784,18 +1800,40 @@ async function showAdminUsers(){
       </div>
       <div style="overflow-x:auto">
         <table class="admin-table">
-          <thead><tr><th>Phone</th><th>Name</th><th>Role</th><th>Sites</th><th></th></tr></thead>
+          <thead><tr><th>Phone</th><th>Name</th><th>Role</th><th>Sites</th><th style="min-width:100px"></th></tr></thead>
           <tbody>
             ${(data||[]).map(u=>`<tr>
               <td>${u.phone}</td><td>${u.name||'—'}</td>
               <td><span class="badge badge-${u.role==='admin'?'red':u.role==='manager'?'blue':'green'}">${u.role}</span></td>
               <td style="font-size:9px;max-width:80px;overflow:hidden;text-overflow:ellipsis">${(u.assigned_sites||[]).join(', ')}</td>
-              <td><span style="color:var(--blue);cursor:pointer;font-size:10px" onclick="openUserModal('${u.id}')">Edit</span></td>
+              <td style="white-space:nowrap">
+                <span style="color:var(--blue);cursor:pointer;font-size:10px" onclick="openUserModal('${u.id}')">Edit</span>
+                <span style="color:var(--orange);cursor:pointer;font-size:10px;margin-left:8px" onclick="openResetPwModal('${u.id}','${(u.name||u.phone).replace(/'/g,"'")}')">Reset PW</span>
+              </td>
             </tr>`).join('')}
           </tbody>
         </table>
       </div>`;
   }catch(e){el.innerHTML='<div class="error-box">Failed to load users</div>';}
+}
+function openResetPwModal(userId, userName){
+  document.getElementById('resetPwUserId').value=userId;
+  document.getElementById('resetPwUserLabel').textContent=userName;
+  document.getElementById('resetPwInput').value='';
+  document.getElementById('resetPwError').classList.add('hidden');
+  document.getElementById('resetPwModal').classList.remove('hidden');
+}
+async function doAdminResetPw(){
+  const userId=document.getElementById('resetPwUserId').value;
+  const pw=document.getElementById('resetPwInput').value.trim();
+  const errEl=document.getElementById('resetPwError');
+  errEl.classList.add('hidden');
+  if(pw.length<8){errEl.textContent='Min 8 characters';errEl.classList.remove('hidden');return;}
+  const hash=await hashPassword(pw);
+  const{error}=await sb.from('users').update({password_hash:hash,must_change_pw:true}).eq('id',userId);
+  if(error){errEl.textContent=error.message;errEl.classList.remove('hidden');return;}
+  document.getElementById('resetPwModal').classList.add('hidden');
+  alert('Password reset. Share the new password with the user — they will be prompted to set a new one on next login.');
 }
 function openUserModal(userId){
   const modal=document.getElementById('modalOverlay');
