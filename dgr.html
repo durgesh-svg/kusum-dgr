@@ -410,6 +410,18 @@ let session=null;
 let sites=[];
 let currentScreen=0;
 let currentTab='dgr';
+
+// ── Hash-based routing ────────────────────────────────────────────────────────
+function navTo(hash){const t='#'+hash;if(window.location.hash!==t)history.pushState(null,'',t);}
+function handleHashNav(){
+  const raw=(window.location.hash||'').replace('#','').trim();
+  const [page,sub]=(raw||'dgr').split('/');
+  if(page==='history')switchTab('history');
+  else if(page==='approvals'&&session&&(session.role==='admin'||session.role==='manager'))switchTab('approvals');
+  else if(page==='admin'&&session&&session.role==='admin'){if(sub)adminTab=sub;switchTab('admin');}
+  else switchTab('dgr');
+}
+window.addEventListener('popstate',()=>{if(session&&session.loggedIn)handleHashNav();});
 let formData={};
 let photoFiles={};  // keyed by slot name
 let acknowledgements={inv_zero:false,pr_low:false,temp_high:false};
@@ -474,7 +486,7 @@ async function enterApp(){
   document.getElementById('appWrap').classList.remove('hidden');
   await Promise.all([loadSites(),loadAppSettings()]);
   buildBottomTabs();
-  switchTab('dgr');
+  handleHashNav();
 }
 async function loadSites(){
   try{
@@ -533,6 +545,7 @@ function buildBottomTabs(){
 }
 function switchTab(tab){
   currentTab=tab;
+  if(tab!=='admin')navTo(tab); // admin hash set by showAdmin() with sub-tab
   document.querySelectorAll('.bottom-tab').forEach(t=>{t.classList.toggle('active',t.dataset.tab===tab);});
   document.querySelectorAll('#screensWrap > div').forEach(d=>d.classList.add('hidden'));
   document.getElementById('headerBar').classList.add('hidden');
@@ -1766,6 +1779,7 @@ async function showApprovalInAdmin(){
 // ADMIN
 let adminTab='users';
 function showAdmin(){
+  navTo('admin/'+adminTab);
   const el=document.getElementById('screenAdmin');
   el.classList.remove('hidden');
   el.innerHTML=`
