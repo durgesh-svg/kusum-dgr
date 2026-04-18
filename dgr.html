@@ -291,6 +291,24 @@ label{display:block;font-size:10px;color:var(--text-muted);font-weight:500;margi
 .silica-pill.silica-orange-active{background:#ffedd5;color:#c2410c}
 /* ── HEADER BADGE override for yellow bg ── */
 #headerBadge .badge-blue{background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.3)}
+/* ── INSIGHTS ── */
+.ins-alert-banner{border-radius:10px;padding:10px 12px;margin-bottom:8px;border:1px solid var(--red-border);background:#fff;border-left:3px solid var(--red)}
+.ins-alert-title{font-size:10px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px}
+.ins-alert-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--gray-light)}
+.ins-alert-row:last-child{border-bottom:none;padding-bottom:0}
+.ins-alert-amber{border-left-color:var(--amber);border-color:var(--amber-border)}
+.ins-alert-amber .ins-alert-title{color:var(--amber)}
+.ins-bar-row{display:flex;align-items:center;gap:8px;padding:4px 0}
+.ins-bar-label{width:52px;font-size:9px;color:var(--gray);flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ins-bar-track{flex:1;height:14px;background:var(--surf-high);border-radius:3px;overflow:hidden;position:relative}
+.ins-bar-fill{height:100%;border-radius:3px;transition:width .3s ease}
+.ins-bar-val{width:44px;font-size:9px;text-align:right;flex-shrink:0;font-weight:700}
+.ins-pr-row{display:flex;align-items:center;padding:6px 0;border-bottom:1px solid var(--gray-light);gap:8px}
+.ins-pr-row:last-child{border-bottom:none}
+.ins-pr-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;font-weight:600}
+.ins-pr-bar{height:8px;background:var(--surf-high);border-radius:99px;overflow:hidden;position:relative}
+.ins-pr-tick{position:absolute;top:0;bottom:0;left:70%;width:1.5px;background:rgba(185,28,28,.35)}
+.ins-pr-val{width:36px;text-align:right;font-size:11px;font-weight:700;flex-shrink:0}
 </style>
 </head>
 <body>
@@ -357,6 +375,7 @@ label{display:block;font-size:10px;color:var(--text-muted);font-weight:500;margi
   <div id="screenHistory" class="screen screen-padded hidden"></div>
   <div id="screenApprovals" class="screen screen-padded hidden"></div>
   <div id="screenAdmin" class="screen screen-padded hidden"></div>
+  <div id="screenInsights" class="screen screen-padded hidden"></div>
 </div>
 <input type="file" id="dgrHistCsvInput" accept=".csv" class="hidden" onchange="handleDgrHistCSV(event)">
 <div id="navBar" class="nav-bar hidden">
@@ -419,6 +438,7 @@ function handleHashNav(){
   if(page==='history')switchTab('history');
   else if(page==='approvals'&&session&&(session.role==='admin'||session.role==='manager'))switchTab('approvals');
   else if(page==='admin'&&session&&session.role==='admin'){if(sub)adminTab=sub;switchTab('admin');}
+  else if(page==='insights'&&session&&(session.role==='admin'||session.role==='manager'))switchTab('insights');
   else switchTab('dgr');
 }
 window.addEventListener('popstate',()=>{if(session&&session.loggedIn)handleHashNav();});
@@ -429,6 +449,9 @@ let todaySubmissions={};
 let appSettings={grid_outage_reasons:[...DEFAULT_GRID_REASONS],plant_fault_codes:[...DEFAULT_FAULT_CODES]};
 let progressDate=new Date().toISOString().split('T')[0]; // selected date for home progress widget
 let show5Day=false; // 5-day panel toggle
+let insightsDays=30;
+let insightsSort='pr';
+let _insightsCache=null;
 
 // AUTH
 async function hashPassword(pwd){
@@ -538,6 +561,8 @@ function buildBottomTabs(){
   ];
   if(session.role==='manager'||session.role==='admin')
     tabs.push({id:'approvals',label:'Approvals',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>'});
+  if(session.role==='manager'||session.role==='admin')
+    tabs.push({id:'insights',label:'Insights',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 16l4-4 4 4 4-8"/></svg>'});
   if(session.role==='admin')
     tabs.push({id:'admin',label:'Admin',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197"/></svg>'});
   el.innerHTML=tabs.map(t=>`<div class="bottom-tab${t.id==='dgr'?' active':''}" data-tab="${t.id}" onclick="switchTab('${t.id}')">${t.icon}<span>${t.label}</span></div>`).join('');
@@ -555,6 +580,7 @@ function switchTab(tab){
   else if(tab==='history')showHistory();
   else if(tab==='approvals')showApprovals();
   else if(tab==='admin')showAdmin();
+  else if(tab==='insights')showInsights();
 }
 
 // SCREEN 0: HOME
@@ -1830,6 +1856,295 @@ async function showAdminUsers(){
       </div>`;
   }catch(e){el.innerHTML='<div class="error-box">Failed to load users</div>';}
 }
+// ── INSIGHTS ─────────────────────────────────────────────────────────────────
+async function showInsights(){
+  const el=document.getElementById('screenInsights');
+  el.classList.remove('hidden');
+  el.innerHTML='<div style="text-align:center;color:var(--gray);padding:40px 0">Loading insights…</div>';
+  const now=Date.now();
+  if(!_insightsCache||_insightsCache.days!==insightsDays||(now-_insightsCache.ts)>300000){
+    const{data,error}=await loadInsightsData(insightsDays);
+    if(error&&(!data||!data.length)){
+      el.innerHTML='<div class="error-box" style="margin:16px">Failed to load data. Check connection.</div>';
+      return;
+    }
+    _insightsCache={data:data||[],days:insightsDays,ts:now};
+  }
+  renderInsights(_insightsCache.data,insightsDays);
+}
+async function loadInsightsData(days){
+  const from=new Date();from.setDate(from.getDate()-days);
+  const fromDate=from.toISOString().split('T')[0];
+  let q=sb.from('dgr_submissions')
+    .select('site_name,report_date,total_gen_kwh,pr_pct,dc_cuf_pct,grid_outage,plant_outage,plant_outage_details,wti_c,oti_c,status,dc_capacity_kw')
+    .gte('report_date',fromDate).order('report_date',{ascending:false});
+  if(session.role==='manager')q=q.in('site_name',session.assigned_sites||[]);
+  return await q;
+}
+function renderInsights(rows,days){
+  const el=document.getElementById('screenInsights');
+  if(!el)return;
+  const today=new Date().toISOString().split('T')[0];
+  const twoDaysAgo=new Date();twoDaysAgo.setDate(twoDaysAgo.getDate()-2);
+  const twoDaysAgoStr=twoDaysAgo.toISOString().split('T')[0];
+
+  // ── per-site accumulator ──
+  const bysite={};
+  rows.forEach(r=>{
+    if(!bysite[r.site_name])bysite[r.site_name]={
+      reports:[],total_gen:0,pr_sum:0,pr_count:0,
+      cuf_sum:0,cuf_count:0,
+      grid_outage_days:0,plant_outage_days:0,
+      fault_codes:[],wti_max:0,oti_max:0,last_report_date:''
+    };
+    const s=bysite[r.site_name];
+    s.reports.push(r);
+    s.total_gen+=(r.total_gen_kwh||0);
+    if((r.pr_pct||0)>0){s.pr_sum+=r.pr_pct;s.pr_count++;}
+    if((r.dc_cuf_pct||0)>0){s.cuf_sum+=r.dc_cuf_pct;s.cuf_count++;}
+    if(r.grid_outage)s.grid_outage_days++;
+    if(r.plant_outage)s.plant_outage_days++;
+    (r.plant_outage_details||[]).forEach(d=>{if(d&&d.fault_code)s.fault_codes.push(d.fault_code);});
+    if((r.wti_c||0)>s.wti_max)s.wti_max=r.wti_c||0;
+    if((r.oti_c||0)>s.oti_max)s.oti_max=r.oti_c||0;
+    if(r.report_date>s.last_report_date)s.last_report_date=r.report_date;
+  });
+
+  // ── per-site enriched ──
+  const siteList=(session.role==='manager'?sites.filter(s=>(session.assigned_sites||[]).includes(s.site_name)):sites);
+  const enriched=siteList.map(cfg=>{
+    const s=bysite[cfg.site_name]||{reports:[],total_gen:0,pr_sum:0,pr_count:0,cuf_sum:0,cuf_count:0,grid_outage_days:0,plant_outage_days:0,fault_codes:[],wti_max:0,oti_max:0,last_report_date:''};
+    const pr_avg=s.pr_count>0?Math.round(s.pr_sum/s.pr_count*10)/10:null;
+    const cuf_avg=s.cuf_count>0?Math.round(s.cuf_sum/s.cuf_count*10)/10:null;
+    const days_since=s.last_report_date?Math.floor((new Date(today)-new Date(s.last_report_date))/86400000):999;
+    return{...cfg,...s,pr_avg,cuf_avg,days_since,report_count:s.reports.length};
+  });
+
+  // ── fleet-level ──
+  const totalSites=enriched.length;
+  const reportingSites=enriched.filter(s=>s.days_since<2).length;
+  const fleetGen=enriched.reduce((a,s)=>a+s.total_gen,0);
+  const prSites=enriched.filter(s=>s.pr_avg!==null);
+  const fleetPr=prSites.length?Math.round(prSites.reduce((a,s)=>a+s.pr_avg,0)/prSites.length*10)/10:null;
+  const outageSites=enriched.filter(s=>s.grid_outage_days+s.plant_outage_days>0).length;
+
+  // ── DC CUF trend by date (fleet avg) ──
+  const cufByDate={};const cufCountByDate={};
+  rows.forEach(r=>{
+    if((r.dc_cuf_pct||0)>0){
+      cufByDate[r.report_date]=(cufByDate[r.report_date]||0)+r.dc_cuf_pct;
+      cufCountByDate[r.report_date]=(cufCountByDate[r.report_date]||0)+1;
+    }
+  });
+  const trendDates=Object.keys(cufByDate).sort().slice(-14);
+  const trendAvgs=trendDates.map(d=>Math.round(cufByDate[d]/cufCountByDate[d]*10)/10);
+  const CUF_MAX=30;
+
+  // ── fault map ──
+  const faultMap={};
+  enriched.forEach(s=>s.fault_codes.forEach(f=>{faultMap[f]=(faultMap[f]||0)+1;}));
+  const topFaults=Object.entries(faultMap).sort((a,b)=>b[1]-a[1]).slice(0,5);
+
+  // ── alerts ──
+  const silentList=enriched.filter(s=>s.days_since>=2).sort((a,b)=>b.days_since-a.days_since);
+  const activeFaultList=enriched.filter(s=>s.reports.some(r=>r.report_date>=twoDaysAgoStr&&r.plant_outage));
+  const lowPrList=enriched.filter(s=>s.pr_avg!==null&&s.pr_avg<70).sort((a,b)=>a.pr_avg-b.pr_avg);
+  const highGridList=enriched.filter(s=>s.grid_outage_days>=3);
+  const highTempList=enriched.filter(s=>s.wti_max>85||s.oti_max>85);
+  const alerts=[];
+  if(silentList.length)alerts.push({level:'red',badge:'SILENT',label:`${silentList.length} site${silentList.length>1?'s':''} not reporting (≥2 days)`,anchor:'ins-silent'});
+  if(activeFaultList.length)alerts.push({level:'red',badge:'FAULT',label:`${activeFaultList.length} site${activeFaultList.length>1?'s':''} with active plant fault`,anchor:'ins-faults'});
+  const amberAlerts=[];
+  if(lowPrList.length)amberAlerts.push({badge:'LOW PR',label:`${lowPrList.length} site${lowPrList.length>1?'s':''} PR below 70%`,anchor:'ins-pr'});
+  if(highGridList.length)amberAlerts.push({badge:'GRID',label:`${highGridList.length} site${highGridList.length>1?'s':''} grid outage ≥3 days`,anchor:'ins-faults'});
+  if(highTempList.length)amberAlerts.push({badge:'TEMP',label:`${highTempList.length} site${highTempList.length>1?'s':''} transformer temp >85°C`,anchor:null});
+
+  // ── outage list ──
+  const outageBySite=enriched.filter(s=>s.grid_outage_days+s.plant_outage_days>0)
+    .sort((a,b)=>(b.grid_outage_days+b.plant_outage_days)-(a.grid_outage_days+a.plant_outage_days)).slice(0,8);
+
+  // ── sorted table ──
+  const sortedSites=[...enriched].sort((a,b)=>insightsSort==='gen'?(b.total_gen-a.total_gen):(a.pr_avg===null?1:b.pr_avg===null?-1:(a.pr_avg-b.pr_avg)));
+
+  const prColor=v=>v===null?'':v>=80?'color:var(--green-dark)':v>=70?'color:var(--amber)':'color:var(--red)';
+  const genLabel=v=>v>=1000?(v/1000).toFixed(1)+'k':v.toFixed(0);
+
+  el.innerHTML=`
+  <div style="background:var(--primary);padding:12px 14px;color:#fff;display:flex;justify-content:space-between;align-items:center;margin:-12px -14px 10px">
+    <div>
+      <div style="font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700">Insights</div>
+      <div style="font-size:10px;opacity:.7;margin-top:1px">Fleet performance · Last ${days} days</div>
+    </div>
+    <span onclick="_insightsCache=null;showInsights()" style="font-size:10px;color:rgba(255,255,255,.85);cursor:pointer;background:rgba(255,255,255,.15);padding:4px 10px;border-radius:99px;border:1px solid rgba(255,255,255,.2)">↺ Refresh</span>
+  </div>
+
+  <!-- Toggle -->
+  <div style="display:flex;gap:6px;align-items:center;margin-bottom:10px">
+    <span class="filter-pill${insightsDays===7?' active':''}" onclick="insightsDays=7;_insightsCache=null;showInsights()">Last 7 days</span>
+    <span class="filter-pill${insightsDays===30?' active':''}" onclick="insightsDays=30;_insightsCache=null;showInsights()">Last 30 days</span>
+  </div>
+
+  <!-- Alerts -->
+  ${alerts.length||amberAlerts.length?`
+    ${alerts.length?`<div class="ins-alert-banner">
+      <div class="ins-alert-title">⚡ Action Required</div>
+      ${alerts.map(a=>`<div class="ins-alert-row">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="badge badge-red">${a.badge}</span>
+          <span style="font-size:11px;font-weight:600">${a.label}</span>
+        </div>
+        ${a.anchor?`<span onclick="document.getElementById('${a.anchor}').scrollIntoView({behavior:'smooth'})" style="font-size:10px;color:var(--blue);white-space:nowrap;cursor:pointer">View →</span>`:''}
+      </div>`).join('')}
+    </div>`:''}
+    ${amberAlerts.length?`<div class="ins-alert-banner ins-alert-amber">
+      <div class="ins-alert-title">⚠ Watch List</div>
+      ${amberAlerts.map(a=>`<div class="ins-alert-row">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="badge badge-yellow">${a.badge}</span>
+          <span style="font-size:11px;font-weight:600">${a.label}</span>
+        </div>
+        ${a.anchor?`<span onclick="document.getElementById('${a.anchor}').scrollIntoView({behavior:'smooth'})" style="font-size:10px;color:var(--blue);white-space:nowrap;cursor:pointer">View →</span>`:''}
+      </div>`).join('')}
+    </div>`:''}
+  `:`<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:#fff;border:1px solid var(--green-border);border-radius:10px;margin-bottom:8px;border-left:3px solid var(--green)">
+    <span class="badge badge-green">✓ ALL CLEAR</span>
+    <span style="font-size:11px;font-weight:600;color:var(--green-dark)">All systems nominal</span>
+  </div>`}
+
+  <!-- KPI Strip -->
+  <div class="grid-2" style="margin-bottom:8px">
+    <div class="stat-card">
+      <div class="stat-num" style="color:var(--green-dark);font-size:16px">${genLabel(fleetGen)}</div>
+      <div class="stat-label">kWh Generated</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num" style="font-size:16px;${prColor(fleetPr)}">${fleetPr!==null?fleetPr+'%':'—'}</div>
+      <div class="stat-label">Avg Fleet PR</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num" style="font-size:16px">${reportingSites}/${totalSites}</div>
+      <div class="stat-label">Sites Reporting</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num" style="font-size:16px;${outageSites>0?'color:var(--red)':'color:var(--green-dark)'}">${outageSites}</div>
+      <div class="stat-label">Outage Sites</div>
+    </div>
+  </div>
+
+  <!-- DC CUF Trend -->
+  <div class="card">
+    <div class="card-title">Fleet Avg DC CUF% — Daily Trend</div>
+    <div style="font-size:9px;color:var(--text-muted);margin-bottom:6px">Avg across reporting sites · line = 20% benchmark</div>
+    ${trendDates.length===0?'<div style="color:var(--gray);font-size:11px;text-align:center;padding:10px">No CUF data available</div>':
+      trendDates.map((d,i)=>{
+        const v=trendAvgs[i];
+        const barPct=Math.round(v/CUF_MAX*100);
+        const benchPct=Math.round(20/CUF_MAX*100);
+        const col=v>=22?'var(--green)':v>=18?'#eab308':'#ef4444';
+        const lbl=new Date(d+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'});
+        return `<div class="ins-bar-row">
+          <div class="ins-bar-label">${lbl}</div>
+          <div class="ins-bar-track">
+            <div class="ins-bar-fill" style="width:${barPct}%;background:${col}"></div>
+            <div style="position:absolute;top:0;bottom:0;left:${benchPct}%;width:1.5px;background:rgba(0,0,0,.2)"></div>
+          </div>
+          <div class="ins-bar-val" style="color:${col}">${v.toFixed(1)}%</div>
+        </div>`;
+      }).join('')}
+    <div style="display:flex;gap:10px;margin-top:8px;padding-top:6px;border-top:1px solid var(--gray-light)">
+      <div style="display:flex;align-items:center;gap:3px;font-size:9px;color:var(--gray)"><div style="width:10px;height:3px;background:var(--green);border-radius:2px"></div>≥22% Good</div>
+      <div style="display:flex;align-items:center;gap:3px;font-size:9px;color:var(--gray)"><div style="width:10px;height:3px;background:#eab308;border-radius:2px"></div>18–22% Watch</div>
+      <div style="display:flex;align-items:center;gap:3px;font-size:9px;color:var(--gray)"><div style="width:10px;height:3px;background:#ef4444;border-radius:2px"></div>&lt;18% Low</div>
+    </div>
+  </div>
+
+  <!-- Low PR -->
+  <div class="card" id="ins-pr">
+    <div class="card-title">⬇ Underperforming Sites — PR &lt; 70%</div>
+    ${lowPrList.length===0?'<span class="badge badge-green">All sites PR ≥ 70%</span>':
+      lowPrList.map(s=>{
+        const col=s.pr_avg>=80?'var(--green)':s.pr_avg>=70?'#eab308':'#ef4444';
+        return `<div class="ins-pr-row">
+          <div class="ins-pr-name">${s.site_name}</div>
+          <div style="flex:1.5;position:relative">
+            <div class="ins-pr-bar">
+              <div style="height:100%;width:${s.pr_avg}%;background:${col};border-radius:99px"></div>
+              <div class="ins-pr-tick"></div>
+            </div>
+          </div>
+          <div class="ins-pr-val" style="color:${col}">${s.pr_avg.toFixed(1)}%</div>
+        </div>`;
+      }).join('')+`<div style="margin-top:6px;font-size:9px;color:var(--text-muted)">${totalSites-lowPrList.length} sites PR ≥ 70%</div>`}
+  </div>
+
+  <!-- Fault Hotspots -->
+  <div class="card" id="ins-faults">
+    <div class="card-title">🔧 Recurring Faults (${days}d)</div>
+    ${topFaults.length===0?'<div style="color:var(--gray);font-size:11px">No plant faults recorded in this period</div>':
+      topFaults.map(([code,count])=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--gray-light)">
+        <div style="font-size:11px">${code}</div>
+        <span class="badge ${count>=8?'badge-red':count>=4?'badge-yellow':'badge-gray'}">${count}×</span>
+      </div>`).join('')}
+  </div>
+
+  <!-- Outage days -->
+  ${outageBySite.length?`<div class="card">
+    <div class="card-title">📊 Outage Days by Site</div>
+    ${outageBySite.map(s=>{
+      const total=s.grid_outage_days+s.plant_outage_days;
+      const pct=Math.min(Math.round(total/days*100),100);
+      return `<div style="padding:4px 0">
+        <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:3px">
+          <span style="font-weight:600">${s.site_name}</span>
+          <span>${s.grid_outage_days?`<span class="badge badge-yellow" style="margin-right:3px">${s.grid_outage_days}d grid</span>`:''}${s.plant_outage_days?`<span class="badge badge-red">${s.plant_outage_days}d plant</span>`:''}</span>
+        </div>
+        <div class="level-bar"><div class="level-fill ${pct>50?'red':pct>25?'amber':'green'}" style="width:${pct}%"></div></div>
+      </div>`;
+    }).join('')}
+  </div>`:''}
+
+  <!-- Silent sites -->
+  <div class="card" id="ins-silent">
+    <div class="card-title">📵 Not Reporting (≥2 days)</div>
+    ${silentList.length===0?'<span class="badge badge-green">All sites reported recently</span>':
+      silentList.map(s=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--gray-light)">
+        <div>
+          <div style="font-size:11px;font-weight:600">${s.site_name}</div>
+          <div style="font-size:9px;color:var(--gray)">Last: ${s.last_report_date||'Never'}</div>
+        </div>
+        <span class="badge badge-red">${s.days_since===999?'No reports':s.days_since+'d ago'}</span>
+      </div>`).join('')}
+  </div>
+
+  <!-- All sites table -->
+  <div class="card" style="overflow-x:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <div class="card-title" style="margin-bottom:0">All Sites Summary</div>
+      <div style="font-size:9px;color:var(--text-muted)">Tap column to sort</div>
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:10px">
+      <thead><tr style="border-bottom:1.5px solid var(--border)">
+        <th style="text-align:left;padding:4px 0;color:var(--gray);font-weight:600">Site</th>
+        <th onclick="insightsSort='pr';renderInsights(_insightsCache.data,insightsDays)" style="text-align:right;padding:4px 4px;cursor:pointer;font-weight:700;color:${insightsSort==='pr'?'var(--primary)':'var(--gray)'}">PR%${insightsSort==='pr'?' ↑':''}</th>
+        <th onclick="insightsSort='gen';renderInsights(_insightsCache.data,insightsDays)" style="text-align:right;padding:4px 4px;cursor:pointer;font-weight:700;color:${insightsSort==='gen'?'var(--primary)':'var(--gray)'}">kWh${insightsSort==='gen'?' ↓':''}</th>
+        <th style="text-align:right;padding:4px 4px;color:var(--gray);font-weight:600">Out.</th>
+      </tr></thead>
+      <tbody>
+        ${sortedSites.map(s=>{
+          const outTotal=s.grid_outage_days+s.plant_outage_days;
+          return `<tr style="border-bottom:1px solid var(--gray-light)">
+            <td style="padding:5px 0;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600">${s.site_name}</td>
+            <td style="text-align:right;padding:5px 4px;font-weight:700;${prColor(s.pr_avg)}">${s.pr_avg!==null?s.pr_avg.toFixed(1)+'%':'—'}</td>
+            <td style="text-align:right;padding:5px 4px">${s.total_gen>0?genLabel(s.total_gen):'—'}</td>
+            <td style="text-align:right;padding:5px 4px">${outTotal>0?`<span class="badge ${outTotal>=7?'badge-red':outTotal>=3?'badge-yellow':'badge-gray'}">${outTotal}</span>`:'—'}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+  </div>`;
+}
+// ── END INSIGHTS ──────────────────────────────────────────────────────────────
+
 function openResetPwModal(userId, userName){
   document.getElementById('resetPwUserId').value=userId;
   document.getElementById('resetPwUserLabel').textContent=userName;
