@@ -1,0 +1,49 @@
+-- Migration: dgr_settings table + Google Sheets sync columns
+-- Status: ALREADY APPLIED via Supabase MCP — kept here for reference only.
+--
+-- What was created:
+--
+-- 1. dgr_settings table (key-value store for DGR app config)
+--    Replaces the incorrect use of app_options (which is a dropdown options table).
+--
+-- CREATE TABLE dgr_settings (
+--   key        TEXT PRIMARY KEY,
+--   value      JSONB,
+--   updated_at TIMESTAMPTZ DEFAULT now()
+-- );
+--
+-- Seeded with:
+--   grid_outage_reasons, plant_fault_codes,
+--   sheets_script_url, sheets_sheet_id, sheets_tab_name, sheets_last_sync
+--
+-- 2. dgr_submissions — added sync tracking columns:
+--    synced_to_sheet  BOOLEAN DEFAULT false
+--    synced_at        TIMESTAMPTZ
+--    + index on synced_to_sheet = false
+--
+-- ─────────────────────────────────────────────────────────────────────────────
+-- OPTIONAL: Auto-sync every 30 minutes via pg_cron
+-- Run this AFTER deploying the Edge Function and confirming manual sync works.
+-- ─────────────────────────────────────────────────────────────────────────────
+--
+-- Step 1: Enable pg_cron (run once, requires Postgres restart on free plan)
+--   ALTER EXTENSION IF EXISTS pg_cron;  -- may already be enabled
+--
+-- Step 2: Enable net extension for HTTP calls
+--   CREATE EXTENSION IF NOT EXISTS http WITH SCHEMA extensions;
+--
+-- Step 3: Schedule the sync job
+--   SELECT cron.schedule(
+--     'sync-dgr-to-sheets',
+--     '*/30 * * * *',
+--     $$
+--       SELECT net.http_post(
+--         url     := 'https://yvlagovdcxwmfkefdrnv.supabase.co/functions/v1/sync-to-sheets',
+--         headers := '{"Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl2bGFnb3ZkY3h3bWZrZWZkcm52Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM0ODc3ODQsImV4cCI6MjA4OTA2Mzc4NH0.uYH7pcSo-pi_ksVMTCWsTiLz5hlt5YZMaVuBRLQvlQ0", "Content-Type": "application/json"}'::jsonb,
+--         body    := '{}'::jsonb
+--       )
+--     $$
+--   );
+--
+-- To check scheduled jobs:   SELECT * FROM cron.job;
+-- To remove the job:         SELECT cron.unschedule('sync-dgr-to-sheets');

@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#7e5700">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>PM KUSUM DGR</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="manifest" href="/dgr_manifest.json">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/dgr.css">
+</head>
+<body>
+<div id="offlineBanner" class="offline-banner">No internet — submissions will be saved locally</div>
+<!-- LOGIN -->
+<div id="loginScreen" class="login-screen">
+  <div style="text-align:center;margin-bottom:16px">
+    <div style="font-size:18px;font-weight:700;color:var(--green)">PM KUSUM · DGR</div>
+    <div style="font-size:11px;color:var(--gray);margin-top:2px">Daily Generation Report</div>
+  </div>
+  <div class="login-card">
+    <div class="login-title">Login</div>
+    <div class="login-sub">Enter your credentials</div>
+    <div style="height:16px"></div>
+    <div class="login-field"><label>Phone number</label><input type="tel" id="loginPhone" placeholder="Enter phone number"></div>
+    <div class="login-field"><label>Password</label>
+      <div class="pw-wrap"><input type="password" id="loginPw" placeholder="Enter password"><button class="pw-toggle" onclick="togglePw('loginPw',this)">👁</button></div>
+    </div>
+    <div id="loginError" class="error-box hidden"></div>
+    <button class="btn btn-primary" onclick="doLogin()" id="loginBtn">Login</button>
+    <div class="login-hint">First login? Use the password set by your admin</div>
+  </div>
+</div>
+<!-- PASSWORD CHANGE -->
+<div id="pwChangeScreen" class="login-screen hidden">
+  <div class="login-card">
+    <div class="login-title">Set your password</div>
+    <div class="login-sub">Choose a new password to continue</div>
+    <div style="height:16px"></div>
+    <div class="login-field"><label>New password</label>
+      <div class="pw-wrap"><input type="password" id="newPw1" placeholder="Min 8 characters"><button class="pw-toggle" onclick="togglePw('newPw1',this)">👁</button></div>
+    </div>
+    <div class="login-field"><label>Confirm password</label>
+      <div class="pw-wrap"><input type="password" id="newPw2" placeholder="Repeat password"><button class="pw-toggle" onclick="togglePw('newPw2',this)">👁</button></div>
+    </div>
+    <div id="pwChangeError" class="error-box hidden"></div>
+    <button class="btn btn-primary" onclick="doChangePw()">Save password</button>
+  </div>
+</div>
+<!-- MAIN APP -->
+<div id="appWrap" class="hidden">
+<div id="headerBar" class="header-bar hidden">
+  <div class="flex-between">
+    <div>
+      <div class="header-title" id="headerTitle">Site & Date</div>
+      <div class="header-sub" id="headerSub">Step 1 of 10</div>
+    </div>
+    <div id="headerBadge"></div>
+  </div>
+  <div class="progress-dots" id="progressDots"></div>
+</div>
+<div id="screensWrap">
+  <div id="screen0" style="min-height:100dvh"></div>
+  <div id="screen1" class="screen hidden"></div>
+  <div id="screen2" class="screen hidden"></div>
+  <div id="screen3" class="screen hidden"></div>
+  <div id="screen4" class="screen hidden"></div>
+  <div id="screen5" class="screen hidden"></div>
+  <div id="screen6" class="screen hidden"></div>
+  <div id="screen7" class="screen hidden"></div>
+  <div id="screen8" class="screen hidden"></div>
+  <div id="screen9" class="screen hidden"></div>
+  <div id="screen10" class="screen hidden"></div>
+  <div id="screenHistory" class="screen screen-padded hidden"></div>
+  <div id="screenApprovals" class="screen screen-padded hidden"></div>
+  <div id="screenAdmin" class="screen screen-padded hidden"></div>
+  <div id="screenInsights" class="screen screen-padded hidden"></div>
+</div>
+<input type="file" id="dgrHistCsvInput" accept=".csv" class="hidden" onchange="handleDgrHistCSV(event)">
+<div id="navBar" class="nav-bar hidden">
+  <button class="btn btn-secondary" id="btnBack" onclick="goBack()" style="padding:10px 16px">← Back</button>
+  <button class="btn btn-primary" id="btnNext" onclick="goNext()" style="flex:1">Next</button>
+</div>
+<div id="bottomTabs" class="bottom-tabs hidden"></div>
+</div>
+<!-- RESET PASSWORD MODAL -->
+<div id="resetPwModal" class="modal-overlay hidden" onclick="if(event.target===this)this.classList.add('hidden')">
+  <div class="modal-content" style="max-width:340px" onclick="event.stopPropagation()">
+    <div class="modal-header"><div class="modal-title">Reset Password</div><button class="modal-close" onclick="document.getElementById('resetPwModal').classList.add('hidden')">✕</button></div>
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">User: <strong id="resetPwUserLabel"></strong></div>
+    <input type="hidden" id="resetPwUserId">
+    <div class="modal-field"><label>Temporary password</label>
+      <div class="pw-wrap"><input type="password" id="resetPwInput" placeholder="Min 8 characters"><button class="pw-toggle" onclick="togglePw('resetPwInput',this)">👁</button></div>
+    </div>
+    <div id="resetPwError" class="error-box hidden"></div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('resetPwModal').classList.add('hidden')">Cancel</button>
+      <button class="btn btn-primary" style="flex:1" onclick="doAdminResetPw()">Reset Password</button>
+    </div>
+  </div>
+</div>
+<!-- MODAL -->
+<div id="modalOverlay" class="modal-overlay hidden" onclick="closeModal(event)">
+  <div class="modal-content" id="modalContent" onclick="event.stopPropagation()"></div>
+</div>
+<input type="file" id="photoInput" accept="image/*" class="hidden" onchange="handlePhoto(event)">
+<input type="file" id="csvInput" accept=".csv" class="hidden" onchange="handleCSV(event)">
+<input type="file" id="siteCsvInput" accept=".csv" class="hidden" onchange="handleSiteBulkCSV(event)">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.mini.min.js"></script>
+<script src="assets/js/app-shell.js"></script>
+<script src="assets/js/auth.js"></script>
+<script src="assets/js/dgr-flow.js"></script>
+<script src="assets/js/history-approvals.js"></script>
+<script src="assets/js/admin-insights.js"></script>
+<script src="assets/js/export-offline.js"></script>
+<script src="assets/js/app-init.js"></script>
+</body>
+</html>
