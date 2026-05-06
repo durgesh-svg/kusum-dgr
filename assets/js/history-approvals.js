@@ -55,7 +55,7 @@ async function loadHistory(){
           <span class="badge badge-gray">PR ${d.pr_pct||0}%</span>
           ${d.grid_outage?'<span class="badge badge-yellow">Grid outage</span>':''}
         </div>
-        ${isReturned?`<div class="warning-box" style="margin-top:8px">Returned by ${d.reviewed_by||'admin'}: ${escHtml(String(d.review_note||''))}</div>`:''}
+        ${isReturned?`<div style="background:var(--red-light);border:1px solid var(--red-border);border-left:3px solid var(--red);border-radius:0 8px 8px 0;padding:8px 11px;margin-top:8px;font-size:11px;color:var(--red);font-weight:600">Rejected by ${escHtml(d.reviewed_by||'admin')}: ${escHtml(String(d.review_note||''))}</div>`:''}
         <div style="margin-top:6px">
           <button class="btn btn-secondary" style="width:100%;padding:6px;font-size:10px" onclick="viewSubmission('${d.id}')">View full summary</button>
           ${isReturned?`<button class="btn btn-primary" style="width:100%;padding:7px;font-size:11px;margin-top:6px" onclick="editSubmission('${d.id}')">Edit & Resubmit</button>`:''}
@@ -104,7 +104,7 @@ async function renderApprovals(el,inAdmin){
               <span class="approval-stat">PR ${d.pr_pct||0}%</span>
               ${flags.join('')}
             </div>
-            ${isReturned?`<div class="warning-box" style="margin:6px 0">Returned: ${escHtml(String(d.review_note||''))}</div>`:''}
+            ${isReturned?`<div style="background:var(--red-light);border:1px solid var(--red-border);border-left:3px solid var(--red);border-radius:0 8px 8px 0;padding:8px 11px;margin:6px 0;font-size:11px;color:var(--red);font-weight:600">Rejected by ${escHtml(d.reviewed_by||'admin')}: ${escHtml(String(d.review_note||''))}</div>`:''}
             <div class="approval-actions">
               <button class="btn btn-secondary" style="flex:1;padding:8px;font-size:11px" onclick="viewSubmission('${d.id}')">View</button>
               ${d.status==='pending'?`
@@ -120,18 +120,71 @@ async function approveSubmission(id){
   showApprovals();
 }
 async function rejectSubmission(id){
-  const note=prompt('Rejection reason:');if(note===null)return;
-  await sb.from('dgr_submissions').update({status:'pending',reviewed_by:session.name,review_note:note,reviewed_at:new Date().toISOString()}).eq('id',id);
-  showApprovals();
+  showRejectModal(id, async(note)=>{
+    await sb.from('dgr_submissions').update({status:'pending',reviewed_by:session.name,review_note:note,reviewed_at:new Date().toISOString()}).eq('id',id);
+    showApprovals();
+  });
 }
 async function approveAndRefreshAdmin(id){
   await sb.from('dgr_submissions').update({status:'approved',reviewed_by:session.name,reviewed_at:new Date().toISOString()}).eq('id',id);
   showApprovalInAdmin();
 }
 async function rejectAndRefreshAdmin(id){
-  const note=prompt('Rejection reason:');if(note===null)return;
-  await sb.from('dgr_submissions').update({status:'pending',reviewed_by:session.name,review_note:note,reviewed_at:new Date().toISOString()}).eq('id',id);
-  showApprovalInAdmin();
+  showRejectModal(id, async(note)=>{
+    await sb.from('dgr_submissions').update({status:'pending',reviewed_by:session.name,review_note:note,reviewed_at:new Date().toISOString()}).eq('id',id);
+    showApprovalInAdmin();
+  });
+}
+
+function showRejectModal(id, onConfirm){
+  window._rejectCallback = onConfirm;
+  const existing=document.getElementById('rejectReasonModal');
+  if(existing)existing.remove();
+  const overlay=document.createElement('div');
+  overlay.id='rejectReasonModal';
+  overlay.style.cssText='position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:300;display:flex;align-items:flex-end;justify-content:center;backdrop-filter:blur(2px)';
+  overlay.innerHTML=`
+    <div style="background:#fff;border-radius:16px 16px 0 0;padding:22px;width:100%;max-width:420px;box-shadow:0 -4px 32px rgba(0,0,0,.15)" onclick="event.stopPropagation()">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+        <div style="width:34px;height:34px;border-radius:50%;background:var(--red-light);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <span style="font-size:16px;color:var(--red)">✕</span>
+        </div>
+        <div>
+          <div style="font-size:15px;font-weight:700;color:var(--red);font-family:'Space Grotesk',sans-serif">Reject Submission</div>
+          <div style="font-size:11px;color:var(--gray);margin-top:1px">This will be sent back to the engineer</div>
+        </div>
+      </div>
+      <div style="background:var(--red-light);border:1px solid var(--red-border);border-left:3px solid var(--red);border-radius:8px;padding:9px 12px;margin:14px 0 12px;font-size:11px;color:var(--red);font-weight:500">
+        The engineer will see your reason in red and can edit &amp; resubmit.
+      </div>
+      <label style="font-size:11px;color:var(--gray);font-weight:600;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em">Rejection Reason *</label>
+      <textarea id="rejectNoteInput" placeholder="Explain why this report is being rejected…"
+        style="width:100%;padding:10px 12px;border:1.5px solid var(--red-border);border-radius:8px;font-size:13px;font-family:inherit;min-height:90px;resize:vertical;outline:none;background:#fff5f5;color:var(--text);line-height:1.5"
+        oninput="const b=document.getElementById('rejectConfirmBtn');b.disabled=!this.value.trim();b.style.opacity=this.value.trim()?'1':'.5'"
+        onfocus="this.style.borderColor='var(--red)';this.style.boxShadow='0 0 0 3px rgba(185,28,28,.12)'"
+        onblur="this.style.borderColor='var(--red-border)';this.style.boxShadow='none'"></textarea>
+      <div id="rejectNoteError" style="display:none;font-size:11px;color:var(--red);font-weight:600;margin-top:4px">Please enter a rejection reason.</div>
+      <div style="display:flex;gap:8px;margin-top:14px">
+        <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('rejectReasonModal').remove()">Cancel</button>
+        <button id="rejectConfirmBtn" disabled
+          style="flex:1;padding:11px;border-radius:8px;font-size:12px;font-weight:700;border:none;cursor:pointer;font-family:inherit;background:var(--red);color:#fff;opacity:.5;transition:opacity .15s"
+          onclick="handleRejectConfirm(this)">Reject</button>
+      </div>
+    </div>`;
+  overlay.addEventListener('click',()=>overlay.remove());
+  document.body.appendChild(overlay);
+  setTimeout(()=>{
+    const ta=document.getElementById('rejectNoteInput');
+    if(ta)ta.focus();
+  },50);
+}
+
+function handleRejectConfirm(btn){
+  const note=document.getElementById('rejectNoteInput').value.trim();
+  if(!note){document.getElementById('rejectNoteError').style.display='block';return;}
+  btn.textContent='Rejecting…';btn.disabled=true;
+  document.getElementById('rejectReasonModal').remove();
+  if(window._rejectCallback){window._rejectCallback(note);window._rejectCallback=null;}
 }
 async function showApprovalInAdmin(){
   const el=document.getElementById('adminContent');

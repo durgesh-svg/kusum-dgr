@@ -43,13 +43,13 @@ async function showAdminUsers(){
               <td style="font-size:9px;max-width:80px;overflow:hidden;text-overflow:ellipsis">${(u.assigned_sites||[]).join(', ')}</td>
               <td style="white-space:nowrap">
                 <span style="color:var(--blue);cursor:pointer;font-size:10px" onclick="openUserModal('${u.id}')">Edit</span>
-                <span style="color:var(--orange);cursor:pointer;font-size:10px;margin-left:8px" onclick="openResetPwModal('${u.id}','${(u.name||u.phone).replace(/'/g,"'")}')">Reset PW</span>
+                <span style="color:var(--orange);cursor:pointer;font-size:10px;margin-left:8px" onclick="openResetPwModal('${u.id}','${String(u.name||u.phone||'').replace(/'/g,"\\'")}')">Reset PW</span>
               </td>
             </tr>`).join('')}
           </tbody>
         </table>
       </div>`;
-  }catch(e){el.innerHTML='<div class="error-box">Failed to load users</div>';}
+  }catch(e){el.innerHTML=`<div class="error-box">Failed to load users: ${e?.message||e}</div>`;console.error('showAdminUsers error:',e);}
 }
 // ── INSIGHTS ─────────────────────────────────────────────────────────────────
 async function showInsights(){
