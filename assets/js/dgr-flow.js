@@ -1241,7 +1241,7 @@ function buildWhatsAppMsg(){
     if(p.sc>0){
       line+=` | Str: ${p.sc} | DC: ${p.dc} kW | CUF: ${p.dcCuf}%`;
       const lossVal=(p.loss!==null&&isFinite(p.loss)&&p.loss>=0)?p.loss:null;
-      line+=` | Loss: ${lossVal!==null?lossVal:'—'}`;
+      line+=` | Loss: ${lossVal!==null?lossVal+'%':'—'}`;
       if(lossVal!==null&&lossVal>4){
         highLossInvs.push({idx:i+1,loss:lossVal,label:getLossLabel(lossVal),emoji:getLossEmoji(lossVal)});
       }
