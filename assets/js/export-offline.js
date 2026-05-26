@@ -8,7 +8,39 @@ function formatDgrRowForSheet(d){
   const gridReasons=(d.grid_outage_details||[]).map(o=>o.reason||'').filter(Boolean).join('; ');
   const plantFaults=(d.plant_outage_details||[]).map(o=>o.fault_code||'').filter(Boolean).join('; ');
   const inv=d.inv_gen||[];
+  const sc=d.inv_strings_count||[];
   const invCols=Array.from({length:20},(_,i)=>inv[i]!==undefined?inv[i]:'');
+
+  // Per-inverter DC performance columns (up to 20)
+  const strCols=Array.from({length:20},(_,i)=>sc[i]!=null&&sc[i]!==''?sc[i]:'');
+  const dcCols=Array.from({length:20},(_,i)=>{
+    const s=parseFloat(sc[i])||0;
+    return s>0?+(s*15.4).toFixed(2):'';
+  });
+  // Find max DC CUF for loss calc
+  const dcCufArr=Array.from({length:20},(_,i)=>{
+    const s=parseFloat(sc[i])||0;
+    const kwh=parseFloat(inv[i])||0;
+    const dc=s>0?+(s*15.4).toFixed(2):0;
+    return dc>0&&kwh>0?+(kwh/(dc*24)*100).toFixed(2):0;
+  });
+  const maxDcCuf=Math.max(...dcCufArr.filter(v=>v>0),0);
+  const dcCufCols=Array.from({length:20},(_,i)=>dcCufArr[i]>0?dcCufArr[i]:'');
+  const lossCols=Array.from({length:20},(_,i)=>{
+    const s=parseFloat(sc[i])||0;
+    const kwh=parseFloat(inv[i])||0;
+    const dc=s>0?+(s*15.4).toFixed(2):0;
+    const cuf=dcCufArr[i];
+    if(!dc||!kwh||!maxDcCuf)return'';
+    return+(((maxDcCuf-cuf)*24*dc)/kwh).toFixed(2);
+  });
+  const kwpCols=Array.from({length:20},(_,i)=>{
+    const s=parseFloat(sc[i])||0;
+    const kwh=parseFloat(inv[i])||0;
+    const dc=s>0?+(s*15.4).toFixed(2):0;
+    return dc>0&&kwh>0?+(kwh/dc).toFixed(2):'';
+  });
+
   return[
     d.report_date,d.site_name,d.submitted_by_name,d.submitted_by_phone,
     d.created_at?new Date(d.created_at).toLocaleString('en-IN'):'',
@@ -19,6 +51,11 @@ function formatDgrRowForSheet(d){
     d.dc_cuf_pct||'',d.ac_cuf_pct||'',d.pr_pct||'',
     d.peak_radiation_wm2||'',d.poa_kwh_m2||'',d.peak_power_kwh||'',
     ...invCols,
+    ...strCols,
+    ...dcCols,
+    ...dcCufCols,
+    ...lossCols,
+    ...kwpCols,
     d.grid_outage?'Yes':'No',gridMins,gridReasons,
     d.plant_outage?'Yes':'No',plantMins,plantFaults,
     d.wti_c||'',d.oti_c||'',d.mog_level||'',d.silica_gel||'',
@@ -38,6 +75,26 @@ const DGR_SHEET_HEADERS=[
   'Inv 6 (kWh)','Inv 7 (kWh)','Inv 8 (kWh)','Inv 9 (kWh)','Inv 10 (kWh)',
   'Inv 11 (kWh)','Inv 12 (kWh)','Inv 13 (kWh)','Inv 14 (kWh)','Inv 15 (kWh)',
   'Inv 16 (kWh)','Inv 17 (kWh)','Inv 18 (kWh)','Inv 19 (kWh)','Inv 20 (kWh)',
+  'Inv 1 Strings','Inv 2 Strings','Inv 3 Strings','Inv 4 Strings','Inv 5 Strings',
+  'Inv 6 Strings','Inv 7 Strings','Inv 8 Strings','Inv 9 Strings','Inv 10 Strings',
+  'Inv 11 Strings','Inv 12 Strings','Inv 13 Strings','Inv 14 Strings','Inv 15 Strings',
+  'Inv 16 Strings','Inv 17 Strings','Inv 18 Strings','Inv 19 Strings','Inv 20 Strings',
+  'Inv 1 DC (kW)','Inv 2 DC (kW)','Inv 3 DC (kW)','Inv 4 DC (kW)','Inv 5 DC (kW)',
+  'Inv 6 DC (kW)','Inv 7 DC (kW)','Inv 8 DC (kW)','Inv 9 DC (kW)','Inv 10 DC (kW)',
+  'Inv 11 DC (kW)','Inv 12 DC (kW)','Inv 13 DC (kW)','Inv 14 DC (kW)','Inv 15 DC (kW)',
+  'Inv 16 DC (kW)','Inv 17 DC (kW)','Inv 18 DC (kW)','Inv 19 DC (kW)','Inv 20 DC (kW)',
+  'Inv 1 DC CUF (%)','Inv 2 DC CUF (%)','Inv 3 DC CUF (%)','Inv 4 DC CUF (%)','Inv 5 DC CUF (%)',
+  'Inv 6 DC CUF (%)','Inv 7 DC CUF (%)','Inv 8 DC CUF (%)','Inv 9 DC CUF (%)','Inv 10 DC CUF (%)',
+  'Inv 11 DC CUF (%)','Inv 12 DC CUF (%)','Inv 13 DC CUF (%)','Inv 14 DC CUF (%)','Inv 15 DC CUF (%)',
+  'Inv 16 DC CUF (%)','Inv 17 DC CUF (%)','Inv 18 DC CUF (%)','Inv 19 DC CUF (%)','Inv 20 DC CUF (%)',
+  'Inv 1 Loss','Inv 2 Loss','Inv 3 Loss','Inv 4 Loss','Inv 5 Loss',
+  'Inv 6 Loss','Inv 7 Loss','Inv 8 Loss','Inv 9 Loss','Inv 10 Loss',
+  'Inv 11 Loss','Inv 12 Loss','Inv 13 Loss','Inv 14 Loss','Inv 15 Loss',
+  'Inv 16 Loss','Inv 17 Loss','Inv 18 Loss','Inv 19 Loss','Inv 20 Loss',
+  'Inv 1 kWh/kWp','Inv 2 kWh/kWp','Inv 3 kWh/kWp','Inv 4 kWh/kWp','Inv 5 kWh/kWp',
+  'Inv 6 kWh/kWp','Inv 7 kWh/kWp','Inv 8 kWh/kWp','Inv 9 kWh/kWp','Inv 10 kWh/kWp',
+  'Inv 11 kWh/kWp','Inv 12 kWh/kWp','Inv 13 kWh/kWp','Inv 14 kWh/kWp','Inv 15 kWh/kWp',
+  'Inv 16 kWh/kWp','Inv 17 kWh/kWp','Inv 18 kWh/kWp','Inv 19 kWh/kWp','Inv 20 kWh/kWp',
   'Grid Outage','Grid Outage (mins)','Grid Outage Reasons',
   'Plant Outage','Plant Outage (mins)','Plant Fault Codes',
   'WTI (°C)','OTI (°C)','MOG Level','Silica Gel',

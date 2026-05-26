@@ -464,3 +464,32 @@ label{display:block;font-size:10px;color:var(--text-muted);font-weight:600;margi
 .ins-pr-bar{height:8px;background:var(--surf-high);border-radius:99px;overflow:hidden;position:relative}
 .ins-pr-tick{position:absolute;top:0;bottom:0;left:70%;width:1.5px;background:rgba(185,28,28,.3)}
 .ins-pr-val{width:36px;text-align:right;font-size:11px;font-weight:700;flex-shrink:0}
+
+/* ── DC Performance table ── */
+.inv-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 -4px}
+.inv-table{min-width:510px;display:flex;flex-direction:column}
+.inv-row{display:grid;grid-template-columns:28px 1fr 52px 46px 52px 56px 66px 54px;align-items:center;gap:4px 5px;padding:3px 4px;border-radius:6px;transition:background .2s ease;margin-bottom:2px}
+.inv-row-header{border-bottom:1.5px solid var(--border);padding-bottom:5px;margin-bottom:3px}
+.inv-row:not(.inv-row-header):hover{background:rgba(0,0,0,.025)}
+.inv-row-best{background:rgba(22,163,74,.08);border-left:3px solid var(--green)}
+.inv-row-worst{background:rgba(185,28,28,.07);border-left:3px solid var(--red-border)}
+.inv-row-best:hover{background:rgba(22,163,74,.12)!important}
+.inv-row-worst:hover{background:rgba(185,28,28,.11)!important}
+.inv-dc-cap,.inv-dc-cuf,.inv-loss{font-size:11px;font-weight:600;text-align:right}
+.inv-dc-cap{color:var(--blue)}
+.inv-dc-cuf{color:var(--green-dark)}
+.inv-loss{color:var(--amber)}
+.perf-badge{display:block;font-size:7px;font-weight:800;padding:1px 4px;border-radius:20px;letter-spacing:.02em;margin-top:2px;text-align:center;white-space:nowrap;line-height:1.4}
+.perf-badge-best{background:#dcfce7;color:var(--green-dark)}
+.perf-badge-worst{background:var(--red-light);color:var(--red)}
+/* Loss warning states */
+.loss-zero{color:var(--green-dark);font-weight:700}
+.loss-ok{color:var(--amber);font-weight:600}
+.loss-attention{color:var(--orange);font-weight:700}
+.loss-high{color:var(--red);font-weight:700}
+.loss-critical{color:var(--red);font-weight:800}
+.loss-badge{display:block;font-size:7px;font-weight:800;padding:1px 4px;border-radius:20px;letter-spacing:.02em;margin-top:2px;text-align:center;white-space:nowrap;line-height:1.4}
+.loss-badge-attention{background:var(--orange-light);color:var(--orange);border:1px solid var(--orange-border)}
+.loss-badge-high{background:var(--red-light);color:var(--red);border:1px solid var(--red-border)}
+.loss-badge-critical{background:var(--red);color:#fff;animation:pulse-loss 1.1s ease-in-out infinite}
+@keyframes pulse-loss{0%,100%{opacity:1}50%{opacity:.55}}

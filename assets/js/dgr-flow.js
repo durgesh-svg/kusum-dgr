@@ -181,6 +181,7 @@ function startDGR(siteName){
     submitted_by_phone:session.phone,
     // Inverter
     inv_gen:new Array(n).fill(0),
+    inv_strings_count:new Array(n).fill(null).map((_,i)=>site&&Array.isArray(site.strings_per_inv)&&site.strings_per_inv[i]!=null?+site.strings_per_inv[i]:''),
     inv_modules_cleaned:new Array(n).fill(null).map(()=>({cleaned:'',total:''})),
     total_gen_kwh:0,
     // Performance
@@ -234,6 +235,7 @@ async function editSubmission(id){
       inverter_count:n,
       strings_per_inv:(data.inv_strings||site?.strings_per_inv||[]),
       inv_gen:Array.isArray(data.inv_gen)?data.inv_gen:new Array(n).fill(0),
+      inv_strings_count:Array.isArray(data.inv_strings_count)?data.inv_strings_count:new Array(n).fill(null).map((_,i)=>site&&Array.isArray(site.strings_per_inv)&&site.strings_per_inv[i]!=null?+site.strings_per_inv[i]:''),
       inv_modules_cleaned:Array.isArray(data.inv_modules_cleaned)?data.inv_modules_cleaned:new Array(n).fill(null).map(()=>({cleaned:'',total:''})),
       grid_outage_details:Array.isArray(data.grid_outage_details)?data.grid_outage_details:[],
       plant_outage_details:Array.isArray(data.plant_outage_details)?data.plant_outage_details:[],
@@ -399,6 +401,104 @@ async function checkDuplicate(){
   }catch(e){el.innerHTML='';}
 }
 
+// DC PERFORMANCE CALCULATIONS
+function calcDCPerf(n){
+  const scArr=formData.inv_strings_count||[];
+  const genArr=formData.inv_gen||[];
+  const results=[];
+  for(let i=0;i<n;i++){
+    const sc=parseFloat(scArr[i])||0;
+    const kwh=parseFloat(genArr[i])||0;
+    const dc=sc>0?+(sc*15.4).toFixed(2):0;
+    const dcCuf=dc>0&&kwh>0?+((kwh/(dc*24))*100).toFixed(2):0;
+    results.push({sc,kwh,dc,dcCuf,loss:null,isBest:false,isWorst:false});
+  }
+  const validCufs=results.filter(r=>r.dcCuf>0).map(r=>r.dcCuf);
+  const maxCuf=validCufs.length?Math.max(...validCufs):0;
+  const minCuf=validCufs.length?Math.min(...validCufs):0;
+  results.forEach(r=>{
+    if(maxCuf>0&&r.dc>0&&r.kwh>0){
+      r.loss=+(((maxCuf-r.dcCuf)*24*r.dc)/r.kwh).toFixed(2);
+    }
+    r.isBest=r.dcCuf>0&&r.dcCuf===maxCuf;
+    r.isWorst=validCufs.length>1&&r.dcCuf>0&&r.dcCuf===minCuf&&minCuf!==maxCuf;
+  });
+  return results;
+}
+
+function getLossHtml(loss){
+  if(loss===null||!isFinite(loss)||loss<0)return'<span class="inv-loss">—</span>';
+  const v=+loss;
+  if(v===0)return'<span class="loss-zero">0</span>';
+  if(v<=4)return`<span class="loss-ok">${v}</span>`;
+  if(v<=8)return`<span class="loss-attention">${v}<span class="loss-badge loss-badge-attention">⚠️ Need Attention</span></span>`;
+  if(v<=15)return`<span class="loss-high">${v}<span class="loss-badge loss-badge-high">🔴 Check Required</span></span>`;
+  return`<span class="loss-critical">${v}<span class="loss-badge loss-badge-critical">🔴 Critical Loss</span></span>`;
+}
+function getLossEmoji(loss){
+  if(loss===null||!isFinite(loss)||loss<0)return'';
+  const v=+loss;
+  if(v<=4)return'✅';
+  return'⚠️';
+}
+function getLossLabel(loss){
+  if(loss===null||!isFinite(loss)||loss<0)return'';
+  const v=+loss;
+  if(v===0)return'Best Performance';
+  if(v<=4)return'Normal';
+  if(v<=8)return'Need Attention';
+  if(v<=15)return'Check Required';
+  return'Critical Loss';
+}
+function updateDCPerfDisplay(n){
+  const perf=calcDCPerf(n);
+  perf.forEach((p,i)=>{
+    const row=document.getElementById('invRow'+i);
+    const dcEl=document.getElementById('s2dc'+i);
+    const cufEl=document.getElementById('s2cuf'+i);
+    const lossEl=document.getElementById('s2loss'+i);
+    if(row){
+      row.className='inv-row'+(p.isBest?' inv-row-best':p.isWorst?' inv-row-worst':'');
+    }
+    if(dcEl)dcEl.textContent=p.dc>0?p.dc+' kW':'—';
+    if(cufEl){
+      if(p.dcCuf>0){
+        const badge=p.isBest?'<span class="perf-badge perf-badge-best">Best Performance</span>':
+                    p.isWorst?'<span class="perf-badge perf-badge-worst">Lowest Performance</span>':'';
+        cufEl.innerHTML=p.dcCuf+'%'+badge;
+      } else cufEl.textContent='—';
+    }
+    if(lossEl)lossEl.innerHTML=getLossHtml(p.loss);
+    const syEl=document.getElementById('s2sy'+i);
+    if(syEl)syEl.textContent=p.dc>0?(p.kwh/p.dc).toFixed(2):'—';
+  });
+}
+
+function onStringCount(idx,val){
+  if(!formData.inv_strings_count)formData.inv_strings_count=[];
+  const inp=document.getElementById('s2sc'+idx);
+  if(val===''||val===null||val===undefined){
+    formData.inv_strings_count[idx]='';
+    updateDCPerfDisplay(formData.inverter_count||1);
+    return;
+  }
+  const v=parseFloat(val);
+  if(isNaN(v)||v<=0){
+    formData.inv_strings_count[idx]='';
+    if(inp)inp.value='';
+    updateDCPerfDisplay(formData.inverter_count||1);
+    return;
+  }
+  if(v>26){
+    formData.inv_strings_count[idx]=26;
+    if(inp)inp.value=26;
+    updateDCPerfDisplay(formData.inverter_count||1);
+    return;
+  }
+  formData.inv_strings_count[idx]=v;
+  updateDCPerfDisplay(formData.inverter_count||1);
+}
+
 // SCREEN 2: INVERTER GENERATION
 function buildScreen2(){
   const el=document.getElementById('screen2');
@@ -407,23 +507,42 @@ function buildScreen2(){
   if(!formData.inv_gen||formData.inv_gen.length!==n)formData.inv_gen=new Array(n).fill(0);
   if(!formData.inv_modules_cleaned||formData.inv_modules_cleaned.length!==n)
     formData.inv_modules_cleaned=new Array(n).fill(null).map(()=>({cleaned:'',total:''}));
+  formData.inv_strings_count=new Array(n).fill('');
   const dc=formData.dc_capacity_kw||0;
   const invKwp=dc>0&&n>0?dc/n:0;
+  const dcPerf=calcDCPerf(n);
 
   let rows='';
   for(let i=0;i<n;i++){
     const s=strs[i]||0;
     const gen=formData.inv_gen[i]||0;
-    const sy=invKwp>0?(gen/invKwp).toFixed(2):'—';
+    const p=dcPerf[i];
+    const sy=p.dc>0?(gen/p.dc).toFixed(2):'—';
     const perStr=s>0?(gen/s).toFixed(1):'—';
     const isZero=gen===0;
+    const rowCls=p.isBest?' inv-row-best':p.isWorst?' inv-row-worst':'';
+    const scVal=formData.inv_strings_count[i];
+    let cufHtml='—';
+    if(p.dcCuf>0){
+      const badge=p.isBest?'<span class="perf-badge perf-badge-best">Best Performance</span>':
+                  p.isWorst?'<span class="perf-badge perf-badge-worst">Lowest Performance</span>':'';
+      cufHtml=p.dcCuf+'%'+badge;
+    }
     rows+=`
-      <div class="inv-num${isZero?' err':''}">${i+1}</div>
-      <input type="number" inputmode="decimal" value="${gen||''}" placeholder="0"
-        class="${isZero?'input-err':''}" style="font-size:12px;padding:6px 8px"
-        onchange="onInvGen(${i},this.value)">
-      <div class="inv-sy" id="s2sy${i}">${sy}</div>
-      <div class="inv-per-str" id="s2ps${i}">${perStr}</div>`;
+      <div class="inv-row${rowCls}" id="invRow${i}">
+        <div class="inv-num${isZero?' err':''}">${i+1}</div>
+        <input type="number" inputmode="decimal" value="${gen||''}" placeholder="0"
+          class="${isZero?'input-err':''}" style="font-size:12px;padding:6px 8px"
+          onchange="onInvGen(${i},this.value)">
+        <div class="inv-sy" id="s2sy${i}">${sy}</div>
+        <div class="inv-per-str" id="s2ps${i}">${perStr}</div>
+        <input type="number" inputmode="numeric" min="1" max="26" id="s2sc${i}" value="" placeholder="—"
+          style="font-size:11px;padding:5px 4px;text-align:center"
+          onchange="onStringCount(${i},this.value)">
+        <div class="inv-dc-cap" id="s2dc${i}">${p.dc>0?p.dc+' kW':'—'}</div>
+        <div class="inv-dc-cuf" id="s2cuf${i}">${cufHtml}</div>
+        <div class="inv-loss" id="s2loss${i}">${getLossHtml(p.loss)}</div>
+      </div>`;
   }
   const total=formData.inv_gen.reduce((a,b)=>a+(+b||0),0);
   formData.total_gen_kwh=+total.toFixed(2);
@@ -447,12 +566,20 @@ function buildScreen2(){
         <div class="card-title" style="margin-bottom:0">Inverter readings</div>
         <span class="text-hint">${invKwp>0?`${invKwp.toFixed(1)} kWp/inv`:''}</span>
       </div>
-      <div class="inv-grid">
-        <div class="inv-header">#</div>
-        <div class="inv-header">kWh</div>
-        <div class="inv-header" style="text-align:right">kWh/kWp</div>
-        <div class="inv-header" style="text-align:right">kWh/str</div>
-        ${rows}
+      <div class="inv-table-wrap">
+        <div class="inv-table">
+          <div class="inv-row inv-row-header">
+            <div class="inv-header">#</div>
+            <div class="inv-header">kWh</div>
+            <div class="inv-header" style="text-align:right">kWh/kWp</div>
+            <div class="inv-header" style="text-align:right">kWh/str</div>
+            <div class="inv-header" style="text-align:center">Strings</div>
+            <div class="inv-header" style="text-align:right">DC kW</div>
+            <div class="inv-header" style="text-align:right">DC CUF%</div>
+            <div class="inv-header" style="text-align:right">Loss</div>
+          </div>
+          ${rows}
+        </div>
       </div>
     </div>
     <div class="auto-calc">
@@ -479,14 +606,14 @@ function onInvGen(idx,val){
   if(totalEl)totalEl.textContent=(+total.toFixed(2))+' kWh';
   const strs=formData.strings_per_inv||[];
   const s=strs[idx]||0;
-  const dc=formData.dc_capacity_kw||0;
-  const n=formData.inverter_count||1;
-  const invKwp=dc>0&&n>0?dc/n:0;
   const gen=formData.inv_gen[idx];
+  const _sc=parseFloat((formData.inv_strings_count||[])[idx])||0;
+  const _perInvDc=_sc>0?+(_sc*15.4).toFixed(2):0;
   const syEl=document.getElementById('s2sy'+idx);
-  if(syEl)syEl.textContent=invKwp>0?(gen/invKwp).toFixed(2):'—';
+  if(syEl)syEl.textContent=_perInvDc>0?(gen/_perInvDc).toFixed(2):'—';
   const psEl=document.getElementById('s2ps'+idx);
   if(psEl)psEl.textContent=s>0?(gen/s).toFixed(1):'—';
+  updateDCPerfDisplay(formData.inverter_count||1);
 }
 function onModCleaned(idx,field,val){
   if(!formData.inv_modules_cleaned[idx])formData.inv_modules_cleaned[idx]={cleaned:'',total:''};
@@ -1001,6 +1128,7 @@ async function submitReport(){
       ac_capacity_kw:formData.ac_capacity_kw,
       inv_gen:formData.inv_gen||[],
       inv_strings:formData.strings_per_inv||[],
+      inv_strings_count:formData.inv_strings_count||[],
       inv_modules_cleaned:formData.inv_modules_cleaned,
       total_gen_kwh:formData.total_gen_kwh,
       peak_radiation_wm2:formData.peak_radiation_wm2,
@@ -1098,22 +1226,57 @@ function buildWhatsAppMsg(){
   const dc_mw=formData.dc_capacity_kw?(formData.dc_capacity_kw/1000).toFixed(2):'—';
   const ac_mw=formData.ac_capacity_kw?(formData.ac_capacity_kw/1000).toFixed(2):'—';
   const d=formData.report_date?formData.report_date.split('-').reverse().join('-'):'';
-  let invLines='';
+
+  // Inverter lines with DC performance fields + loss warning emoji
   const inv=formData.inv_gen||[];
-  for(let i=0;i<inv.length;i++){
-    if(i>0&&i%3===0)invLines+='\n';else if(i>0)invLines+=' | ';
-    invLines+=`Inv ${i+1}: ${inv[i]} kWh`;
+  const n=inv.length;
+  const dcPerf=calcDCPerf(n);
+  let invLines='';
+  const highLossInvs=[];
+  for(let i=0;i<n;i++){
+    const p=dcPerf[i];
+    const kwh=inv[i]||0;
+    const emoji=kwh===0?'🔴':p.sc>0?getLossEmoji(p.loss):'';
+    let line=`${emoji?emoji+' ':''}Inv ${i+1}: ${kwh} kWh`;
+    if(p.sc>0){
+      line+=` | Str: ${p.sc} | DC: ${p.dc} kW | CUF: ${p.dcCuf}%`;
+      const lossVal=(p.loss!==null&&isFinite(p.loss)&&p.loss>=0)?p.loss:null;
+      line+=` | Loss: ${lossVal!==null?lossVal:'—'}`;
+      if(lossVal!==null&&lossVal>4){
+        highLossInvs.push({idx:i+1,loss:lossVal,label:getLossLabel(lossVal),emoji:getLossEmoji(lossVal)});
+      }
+    }
+    invLines+=(i>0?'\n':'')+line;
   }
+  // Loss summary section (sorted highest loss first)
+  let lossSummary='';
+  if(highLossInvs.length>0){
+    highLossInvs.sort((a,b)=>b.loss-a.loss);
+    lossSummary=`\n\n⚠️ Loss Alert (${highLossInvs.length} inverter${highLossInvs.length>1?'s':''} need attention):\n`;
+    lossSummary+=highLossInvs.map(x=>`${x.emoji} Inv ${x.idx}: Loss ${x.loss} — ${x.label}`).join('\n');
+  }
+  const bestInv=dcPerf.find(p=>p.isBest);
+  const bestLine=bestInv?`\n✅ Best Performance: Inv ${dcPerf.indexOf(bestInv)+1} (CUF: ${bestInv.dcCuf}%)`:'';
+
+
+  // Grid outage details
   const gridMins=(formData.grid_outage_details||[]).reduce((a,o)=>a+calcMins(o.from,o.to),0);
-  const plantMins=(formData.plant_outage_details||[]).reduce((a,o)=>a+calcMins(o.from,o.to),0);
   let gridDetails='';
   if(formData.grid_outage&&formData.grid_outage_details){
-    formData.grid_outage_details.forEach(o=>{gridDetails+=`\n  ${o.from||'?'}–${o.to||'?'} · ${o.reason||''} ${o.reason==='Others'?o.reason_other||'':''}`;});
+    formData.grid_outage_details.forEach(o=>{
+      gridDetails+=`\n  ${o.from||'?'}–${o.to||'?'} · ${o.reason||''}${o.reason==='Others'?' '+( o.reason_other||''):''}`;
+    });
   }
+
+  // Plant outage details
+  const plantMins=(formData.plant_outage_details||[]).reduce((a,o)=>a+calcMins(o.from,o.to),0);
   let plantDetails='';
   if(formData.plant_outage&&formData.plant_outage_details){
-    formData.plant_outage_details.forEach(o=>{plantDetails+=`\n  ${o.from||'?'}–${o.to||'?'} · ${o.fault_code||''} ${o.sub_fault?'('+o.sub_fault+')':''}`;});
+    formData.plant_outage_details.forEach(o=>{
+      plantDetails+=`\n  ${o.from||'?'}–${o.to||'?'} · ${o.fault_code||''}${o.sub_fault?' ('+o.sub_fault+')':''}`;
+    });
   }
+
   return `TODAY DGR 🌞
 Site :- ${formData.site_name}
 DC :- ${dc_mw} MW | AC :- ${ac_mw} MW
@@ -1145,7 +1308,9 @@ Modules cleaned :- ${formData.modules_cleaned_today||0} / ${formData.modules_tot
 Activity :- ${formData.daily_activity||'—'}
 Remarks :- ${formData.remarks||'—'}
 
-Submitted by :- ${formData.submitted_by_name}`;
+Submitted by :- ${formData.submitted_by_name}${lossSummary}${bestLine}
+
+🔴 ✅ ⚠️`;
 }
 function shareWhatsApp(){window.open('https://wa.me/?text='+encodeURIComponent(buildWhatsAppMsg()),'_blank');}
 function escHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}

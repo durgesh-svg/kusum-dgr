@@ -71,7 +71,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // ── 3. Flatten each row into the 55-column sheet format ─────────────────
+    // ── 3. Flatten each row into the 155-column sheet format ─────────────────
     function calcMins(o: { from?: string; to?: string }) {
       if (!o?.from || !o?.to) return 0;
       const [fh, fm] = o.from.split(':').map(Number);
@@ -86,8 +86,49 @@ Deno.serve(async (req) => {
       const plantMins = plantDetails.reduce((a, o) => a + calcMins(o), 0);
       const gridReasons = gridDetails.map(o => o.reason || '').filter(Boolean).join('; ');
       const plantFaults = plantDetails.map(o => o.fault_code || '').filter(Boolean).join('; ');
+
       const inv = (d.inv_gen as number[]) || [];
+      const sc  = (d.inv_strings_count as (number|string)[]) || [];
+
+      // Inv kWh cols (20)
       const invCols = Array.from({ length: 20 }, (_, i) => inv[i] !== undefined ? inv[i] : '');
+
+      // String count cols (20)
+      const strCols = Array.from({ length: 20 }, (_, i) => (sc[i] != null && sc[i] !== '') ? sc[i] : '');
+
+      // DC kW cols (20) = strings × 15.4
+      const dcCols = Array.from({ length: 20 }, (_, i) => {
+        const s = parseFloat(String(sc[i])) || 0;
+        return s > 0 ? +(s * 15.4).toFixed(2) : '';
+      });
+
+      // DC CUF% cols (20)
+      const dcCufArr = Array.from({ length: 20 }, (_, i) => {
+        const s   = parseFloat(String(sc[i])) || 0;
+        const kwh = parseFloat(String(inv[i])) || 0;
+        const dc  = s > 0 ? +(s * 15.4).toFixed(2) : 0;
+        return dc > 0 && kwh > 0 ? +(kwh / (dc * 24) * 100).toFixed(2) : 0;
+      });
+      const maxDcCuf = Math.max(...dcCufArr.filter(v => v > 0), 0);
+      const dcCufCols = Array.from({ length: 20 }, (_, i) => dcCufArr[i] > 0 ? dcCufArr[i] : '');
+
+      // Loss cols (20)
+      const lossCols = Array.from({ length: 20 }, (_, i) => {
+        const s   = parseFloat(String(sc[i])) || 0;
+        const kwh = parseFloat(String(inv[i])) || 0;
+        const dc  = s > 0 ? +(s * 15.4).toFixed(2) : 0;
+        const cuf = dcCufArr[i];
+        if (!dc || !kwh || !maxDcCuf) return '';
+        return +(((maxDcCuf - cuf) * 24 * dc) / kwh).toFixed(2);
+      });
+
+      // kWh/kWp cols (20)
+      const kwpCols = Array.from({ length: 20 }, (_, i) => {
+        const s   = parseFloat(String(sc[i])) || 0;
+        const kwh = parseFloat(String(inv[i])) || 0;
+        const dc  = s > 0 ? +(s * 15.4).toFixed(2) : 0;
+        return dc > 0 && kwh > 0 ? +(kwh / dc).toFixed(2) : '';
+      });
 
       return [
         d.report_date,
@@ -109,6 +150,11 @@ Deno.serve(async (req) => {
         d.poa_kwh_m2 || '',
         d.peak_power_kwh || '',
         ...invCols,
+        ...strCols,
+        ...dcCols,
+        ...dcCufCols,
+        ...lossCols,
+        ...kwpCols,
         d.grid_outage ? 'Yes' : 'No', gridMins, gridReasons,
         d.plant_outage ? 'Yes' : 'No', plantMins, plantFaults,
         d.wti_c || '', d.oti_c || '', d.mog_level || '', d.silica_gel || '',
