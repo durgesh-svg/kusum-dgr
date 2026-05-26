@@ -439,7 +439,7 @@ function getLossEmoji(loss){
   if(loss===null||!isFinite(loss)||loss<0)return'';
   const v=+loss;
   if(v<=4)return'✅';
-  return'⚠️';
+  return'🔹';
 }
 function getLossLabel(loss){
   if(loss===null||!isFinite(loss)||loss<0)return'';
@@ -1310,7 +1310,7 @@ Remarks :- ${formData.remarks||'—'}
 
 Submitted by :- ${formData.submitted_by_name}${lossSummary}${bestLine}
 
-🔴 ✅ ⚠️`;
+🔴 ✅ 🔹`;
 }
 function shareWhatsApp(){window.open('https://wa.me/?text='+encodeURIComponent(buildWhatsAppMsg()),'_blank');}
 function escHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
