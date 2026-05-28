@@ -78,6 +78,7 @@
   <div id="screenApprovals" class="screen screen-padded hidden"></div>
   <div id="screenAdmin" class="screen screen-padded hidden"></div>
   <div id="screenInsights" class="screen screen-padded hidden"></div>
+  <div id="screenOverview" class="screen screen-padded hidden"></div>
 </div>
 <input type="file" id="dgrHistCsvInput" accept=".csv" class="hidden" onchange="handleDgrHistCSV(event)">
 <div id="navBar" class="nav-bar hidden">
@@ -110,6 +111,7 @@
 <input type="file" id="csvInput" accept=".csv" class="hidden" onchange="handleCSV(event)">
 <input type="file" id="siteCsvInput" accept=".csv" class="hidden" onchange="handleSiteBulkCSV(event)">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.mini.min.js"></script>
 <script src="assets/js/app-shell.js"></script>
 <script src="assets/js/auth.js"></script>
@@ -117,6 +119,7 @@
 <script src="assets/js/history-approvals.js"></script>
 <script src="assets/js/admin-insights.js"></script>
 <script src="assets/js/export-offline.js"></script>
+<script src="assets/js/overview.js"></script>
 <script src="assets/js/app-init.js"></script>
 </body>
 </html>

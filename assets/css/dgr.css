@@ -467,8 +467,8 @@ label{display:block;font-size:10px;color:var(--text-muted);font-weight:600;margi
 
 /* ── DC Performance table ── */
 .inv-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 -4px}
-.inv-table{min-width:510px;display:flex;flex-direction:column}
-.inv-row{display:grid;grid-template-columns:28px 1fr 52px 46px 52px 56px 66px 54px;align-items:center;gap:4px 5px;padding:3px 4px;border-radius:6px;transition:background .2s ease;margin-bottom:2px}
+.inv-table{min-width:620px;display:flex;flex-direction:column}
+.inv-row{display:grid;grid-template-columns:26px minmax(80px,1fr) 54px 48px 54px 58px 72px 56px;align-items:center;gap:4px 6px;padding:3px 4px;border-radius:6px;transition:background .2s ease;margin-bottom:2px}
 .inv-row-header{border-bottom:1.5px solid var(--border);padding-bottom:5px;margin-bottom:3px}
 .inv-row:not(.inv-row-header):hover{background:rgba(0,0,0,.025)}
 .inv-row-best{background:rgba(22,163,74,.08);border-left:3px solid var(--green)}
@@ -479,6 +479,48 @@ label{display:block;font-size:10px;color:var(--text-muted);font-weight:600;margi
 .inv-dc-cap{color:var(--blue)}
 .inv-dc-cuf{color:var(--green-dark)}
 .inv-loss{color:var(--amber)}
+
+/* ── Mobile: 2-row card layout per inverter ── */
+.inv-stat-item{flex:1;text-align:center;border-right:1px solid var(--border)}
+.inv-stat-item:last-child{border-right:none}
+.inv-stat-label{font-size:8px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:2px}
+.inv-stat-value{font-size:11px;font-weight:700;display:block}
+@media(max-width:540px){
+  .inv-table-wrap{overflow-x:visible;margin:0}
+  .inv-table{min-width:unset}
+  .inv-row-header{display:none}
+  .inv-row{
+    display:grid;
+    grid-template-columns:28px 1fr 80px;
+    grid-template-rows:auto auto;
+    gap:6px 8px;
+    padding:8px 10px;
+    border:1px solid var(--border);border-radius:8px;
+    margin-bottom:6px;background:var(--card-bg)
+  }
+  .inv-row-best{border-left:3px solid var(--green);background:rgba(22,163,74,.06)}
+  .inv-row-worst{border-left:3px solid var(--red-border);background:rgba(185,28,28,.05)}
+  /* hide desktop-only columns */
+  .inv-row .inv-sy,
+  .inv-row .inv-per-str,
+  .inv-row .inv-dc-cap,
+  .inv-row .inv-dc-cuf,
+  .inv-row .inv-loss{display:none}
+  /* inv number: row1 col1 */
+  .inv-row .inv-num{grid-column:1;grid-row:1;align-self:center}
+  /* kwh input: row1 col2 */
+  .inv-row input[type=number]:first-of-type{grid-column:2;grid-row:1}
+  /* strings input: row1 col3 */
+  .inv-row input[id^="s2sc"]{grid-column:3;grid-row:1}
+  /* stats strip: row2 spans all 3 cols */
+  .inv-row .inv-stats-row{
+    display:flex!important;
+    grid-column:1/-1;grid-row:2;
+    border-top:1px solid var(--border);
+    padding-top:6px;margin-top:0;
+    gap:0;width:100%
+  }
+}
 .perf-badge{display:block;font-size:7px;font-weight:800;padding:1px 4px;border-radius:20px;letter-spacing:.02em;margin-top:2px;text-align:center;white-space:nowrap;line-height:1.4}
 .perf-badge-best{background:#dcfce7;color:var(--green-dark)}
 .perf-badge-worst{background:var(--red-light);color:var(--red)}
@@ -493,3 +535,34 @@ label{display:block;font-size:10px;color:var(--text-muted);font-weight:600;margi
 .loss-badge-high{background:var(--red-light);color:var(--red);border:1px solid var(--red-border)}
 .loss-badge-critical{background:var(--red);color:#fff;animation:pulse-loss 1.1s ease-in-out infinite}
 @keyframes pulse-loss{0%,100%{opacity:1}50%{opacity:.55}}
+/* ── Overview Dashboard ── */
+.ov-table-row{display:grid;grid-template-columns:90px 1fr 1fr 80px 90px 70px 80px;gap:6px;padding:8px 6px;border-bottom:1px solid var(--border);font-size:11px;align-items:center}
+.ov-table-row:last-child{border-bottom:none}
+.ov-table-header{font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;background:var(--gray-light);border-radius:6px;padding:7px 6px;border-bottom:none}
+.ov-table-row:not(.ov-table-header):hover{background:var(--surf-low)}
+.ov-status-pill{font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;letter-spacing:.03em}
+.ov-status-on-time{background:var(--green-light);color:var(--green-dark)}
+.ov-status-late{background:var(--orange-light);color:var(--orange)}
+.ov-status-very-late{background:var(--red-light);color:var(--red)}
+/* Overview sub-tabs */
+.ov-sub-tabs{display:flex;gap:8px;margin-bottom:10px}
+.ov-sub-tab{flex:1;text-align:center;padding:10px 8px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;background:var(--gray-light);color:var(--gray);border:1.5px solid transparent;transition:.18s ease}
+.ov-sub-tab.active{background:var(--primary-cont);color:var(--primary);border-color:var(--primary-dim)}
+.ov-perf-row{display:grid;grid-template-columns:1fr 50px 90px 70px 70px 70px 80px 80px;gap:6px;padding:8px 6px;border-bottom:1px solid var(--border);font-size:11px;align-items:center}
+.ov-perf-row:last-child{border-bottom:none}
+.ov-perf-row:not(.ov-table-header):hover{background:var(--surf-low)}
+.ov-pagination{display:flex;align-items:center;justify-content:center;gap:10px;padding:10px 0 4px}
+.ov-page-btn{padding:6px 14px;border:1.5px solid var(--border);border-radius:6px;font-size:12px;font-weight:600;background:#fff;cursor:pointer;color:var(--text);transition:.15s ease}
+.ov-page-btn:hover:not(:disabled){background:var(--primary-cont);border-color:var(--primary-dim);color:var(--primary)}
+.ov-page-btn:disabled{opacity:.4;cursor:default}
+.ov-page-info{font-size:12px;color:var(--gray);font-weight:600}
+/* Engineer summary row — 6 cols */
+.ov-eng-row{display:grid;grid-template-columns:1fr 50px 60px 50px 70px 80px;gap:6px;padding:8px 6px;border-bottom:1px solid var(--border);font-size:11px;align-items:center}
+.ov-eng-row:last-child{border-bottom:none}
+.ov-eng-row:not(.ov-table-header):hover{background:var(--surf-low)}
+/* Inverter health row — 4 cols */
+.ov-inv-row{display:grid;grid-template-columns:70px 70px 1fr 90px;gap:6px;padding:8px 6px;border-bottom:1px solid var(--border);font-size:11px;align-items:center}
+.ov-inv-row:last-child{border-bottom:none}
+.ov-inv-row:not(.ov-table-header):hover{background:var(--surf-low)}
+/* Overview tab panels */
+.ov-tab-panel{}

@@ -5,6 +5,7 @@ function showAdmin(){
   el.classList.remove('hidden');
   el.innerHTML=`
     <div class="admin-tabs">
+      <div class="admin-tab${adminTab==='dgr'?' active':''}" onclick="adminTab='dgr';showAdmin()">DGR</div>
       <div class="admin-tab${adminTab==='users'?' active':''}" onclick="adminTab='users';showAdmin()">Users</div>
       <div class="admin-tab${adminTab==='sites'?' active':''}" onclick="adminTab='sites';showAdmin()">Sites</div>
       <div class="admin-tab${adminTab==='approvals'?' active':''}" onclick="adminTab='approvals';showAdmin()">Approvals</div>
@@ -14,7 +15,8 @@ function showAdmin(){
     </div>
     <div id="adminContent"></div>
   `;
-  if(adminTab==='users')showAdminUsers();
+  if(adminTab==='dgr')showAdminDGR();
+  else if(adminTab==='users')showAdminUsers();
   else if(adminTab==='sites')showAdminSites();
   else if(adminTab==='approvals'){approvalFilter='pending';showApprovalInAdmin();}
   else if(adminTab==='settings')showAdminSettings();
@@ -22,11 +24,173 @@ function showAdmin(){
   else if(adminTab==='import')showAdminImport();
 }
 
+// ── ADMIN DGR STATUS PAGE ─────────────────────────────────────────────────────
+let _dgrStatusTab='pending';
+let _dgrDate=new Date().toISOString().split('T')[0];
+let _dgrChannel=null;
+
+function showAdminDGR(){
+  const el=document.getElementById('adminContent');
+  el.innerHTML='<div style="text-align:center;color:var(--gray);padding:20px">Loading…</div>';
+  // cleanup old real-time channel
+  if(_dgrChannel){try{sb.removeChannel(_dgrChannel);}catch(e){}  _dgrChannel=null;}
+  // subscribe to real-time changes on dgr_submissions
+  _dgrChannel=sb.channel('dgr-admin-status')
+    .on('postgres_changes',{event:'*',schema:'public',table:'dgr_submissions'},()=>{
+      if(adminTab==='dgr')_renderDGRStatus();
+    })
+    .subscribe();
+  _renderDGRStatus();
+}
+
+async function _renderDGRStatus(){
+  const el=document.getElementById('adminContent');
+  if(!el)return;
+
+  // Fetch all submissions for selected date
+  const{data,error}=await sb.from('dgr_submissions')
+    .select('id,site_name,report_date,status,total_gen_kwh,pr_pct,submitted_by_name,review_note,reviewed_by,created_at,grid_outage')
+    .eq('report_date',_dgrDate)
+    .order('created_at',{ascending:false});
+
+  if(error){el.innerHTML=`<div class="error-box">Failed to load DGR data: ${error.message}</div>`;return;}
+
+  const submissions=data||[];
+  const submittedSites=new Set(submissions.map(s=>s.site_name));
+  const approved=submissions.filter(s=>s.status==='approved');
+  const pending=submissions.filter(s=>s.status==='pending');
+  const rejected=submissions.filter(s=>s.status==='rejected');
+  const notDone=sites.filter(s=>!submittedSites.has(s.site_name));
+
+  const counts={approved:approved.length,pending:pending.length,rejected:rejected.length,not_done:notDone.length};
+  const total=sites.length||1;
+
+  const tabDefs=[
+    {id:'pending', label:'Pending',  count:counts.pending,  dot:'#f59e0b', badge:'badge-yellow'},
+    {id:'approved',label:'Approved', count:counts.approved, dot:'#16a34a', badge:'badge-green'},
+    {id:'rejected',label:'Rejected', count:counts.rejected, dot:'var(--red)', badge:'badge-red'},
+    {id:'not_done',label:'Not Done', count:counts.not_done, dot:'#9ca3af', badge:'badge-gray'},
+  ];
+
+  // Summary bar
+  const summaryBar=`
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:10px">
+      ${tabDefs.map(t=>`
+        <div onclick="_dgrStatusTab='${t.id}';_renderDGRStatus()" style="background:#fff;border:2px solid ${_dgrStatusTab===t.id?t.dot:'var(--border)'};border-radius:10px;padding:10px 6px;text-align:center;cursor:pointer;transition:all .15s">
+          <div style="font-size:20px;font-weight:800;color:${t.dot};font-family:'Space Grotesk',sans-serif">${t.count}</div>
+          <div style="font-size:9px;color:var(--gray);font-weight:600;margin-top:2px;text-transform:uppercase;letter-spacing:.04em">${t.label}</div>
+        </div>`).join('')}
+    </div>`;
+
+  // Date picker + coverage bar
+  const done=submissions.length;
+  const pct=Math.round(done/total*100);
+  const header=`
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:8px;flex-wrap:wrap">
+      <div style="font-size:12px;font-weight:700;color:var(--text)">DGR Status</div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <input type="date" value="${_dgrDate}" onchange="_dgrDate=this.value;_renderDGRStatus()"
+          style="padding:5px 8px;font-size:11px;border:1px solid var(--border);border-radius:7px;font-family:inherit;color:var(--text);background:#fff">
+        <button onclick="_renderDGRStatus()" style="padding:5px 10px;font-size:11px;border:1px solid var(--border);border-radius:7px;background:#fff;cursor:pointer;font-family:inherit">↺ Refresh</button>
+      </div>
+    </div>
+    <div style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--gray);margin-bottom:4px">
+        <span>Submitted: <strong>${done}/${total}</strong></span>
+        <span>${pct}% done</span>
+      </div>
+      <div style="height:6px;background:var(--border);border-radius:99px;overflow:hidden">
+        <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,var(--primary),var(--primary-dim));border-radius:99px;transition:width .3s"></div>
+      </div>
+    </div>`;
+
+  // Status pills row
+  const pillsRow=`
+    <div style="display:flex;gap:5px;margin-bottom:10px;flex-wrap:wrap">
+      ${tabDefs.map(t=>`
+        <div onclick="_dgrStatusTab='${t.id}';_renderDGRStatus()"
+          style="padding:5px 12px;border-radius:20px;font-size:10px;font-weight:700;cursor:pointer;border:1.5px solid ${_dgrStatusTab===t.id?t.dot:'var(--border)'};background:${_dgrStatusTab===t.id?'rgba(0,0,0,.04)':'#fff'};color:${_dgrStatusTab===t.id?t.dot:'var(--gray)'};transition:all .15s">
+          ${t.label} <span style="font-weight:800">${t.count}</span>
+        </div>`).join('')}
+    </div>`;
+
+  // Content for active tab
+  let tabContent='';
+  if(_dgrStatusTab==='approved'){
+    tabContent=approved.length?approved.map(d=>_dgrCard(d,'approved')).join('')
+      :'<div class="card" style="text-align:center;color:var(--gray);padding:16px">No approved submissions</div>';
+  } else if(_dgrStatusTab==='pending'){
+    tabContent=pending.length?pending.map(d=>_dgrCard(d,'pending')).join('')
+      :'<div class="card" style="text-align:center;color:var(--gray);padding:16px">No pending submissions</div>';
+  } else if(_dgrStatusTab==='rejected'){
+    tabContent=rejected.length?rejected.map(d=>_dgrCard(d,'rejected')).join('')
+      :'<div class="card" style="text-align:center;color:var(--gray);padding:16px">No rejected submissions</div>';
+  } else if(_dgrStatusTab==='not_done'){
+    tabContent=notDone.length?notDone.map(s=>`
+      <div class="history-card" style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <div>
+          <div class="history-site">${escHtml(s.site_name)}</div>
+          <div class="history-date" style="margin-top:2px">${s.capacity_kwp||'—'} kWp</div>
+        </div>
+        <span class="badge badge-gray">Not submitted</span>
+      </div>`).join('')
+      :'<div class="card" style="text-align:center;color:var(--gray);padding:16px">All sites have submitted ✓</div>';
+  }
+
+  el.innerHTML=header+summaryBar+pillsRow+`<div id="dgrTabContent">${tabContent}</div>`;
+}
+
+function _dgrCard(d,status){
+  const dateStr=new Date(d.report_date+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
+  const badgeCls=status==='approved'?'badge-green':status==='rejected'?'badge-red':'badge-yellow';
+  const isRejected=status==='rejected';
+  return `<div class="history-card">
+    <div class="flex-between" style="margin-bottom:6px">
+      <div>
+        <div class="history-site">${escHtml(d.site_name)}</div>
+        <div class="history-date">${dateStr}${d.submitted_by_name?' · '+escHtml(d.submitted_by_name):''}</div>
+      </div>
+      <span class="badge ${badgeCls}">${status}</span>
+    </div>
+    <div class="history-stats" style="margin-bottom:${isRejected?'6px':'0'}">
+      <span class="badge badge-gray">${d.total_gen_kwh||0} kWh</span>
+      <span class="badge badge-gray">PR ${d.pr_pct||0}%</span>
+      ${d.grid_outage?'<span class="badge badge-yellow">Grid outage</span>':''}
+    </div>
+    ${isRejected&&d.review_note?`<div style="background:var(--red-light);border:1px solid var(--red-border);border-left:3px solid var(--red);border-radius:0 8px 8px 0;padding:7px 10px;font-size:11px;color:var(--red);font-weight:600">Rejected by ${escHtml(d.reviewed_by||'admin')}: ${escHtml(String(d.review_note||''))}</div>`:''}
+    <div style="margin-top:6px;display:flex;gap:6px">
+      <button class="btn btn-secondary" style="flex:1;padding:6px;font-size:10px" onclick="viewSubmission('${d.id}')">View</button>
+      ${status==='pending'?`
+        <button class="btn btn-primary" style="flex:1;padding:6px;font-size:10px" onclick="approveAndRefreshDGR('${d.id}')">Approve</button>
+        <button class="btn" style="flex:1;padding:6px;font-size:10px;background:var(--red-light);color:var(--red);border:1px solid var(--red-border)" onclick="rejectAndRefreshDGR('${d.id}')">Reject</button>`:''}
+    </div>
+  </div>`;
+}
+
+async function approveAndRefreshDGR(id){
+  await sb.from('dgr_submissions').update({status:'approved',reviewed_by:session.name,reviewed_at:new Date().toISOString()}).eq('id',id);
+  _renderDGRStatus();
+}
+async function rejectAndRefreshDGR(id){
+  showRejectModal(id,async(note)=>{
+    await sb.from('dgr_submissions').update({status:'pending',reviewed_by:session.name,review_note:note,reviewed_at:new Date().toISOString()}).eq('id',id);
+    _renderDGRStatus();
+  });
+}
+
 async function showAdminUsers(){
   const el=document.getElementById('adminContent');
   el.innerHTML='<div style="text-align:center;color:var(--gray);padding:10px">Loading...</div>';
   try{
     const{data}=await sb.from('users').select('*').order('name');
+    // Sort: users with name/phone first, then nulls
+    (data||[]).sort((a,b) => {
+      const aVal = a.name || a.phone;
+      const bVal = b.name || b.phone;
+      if (aVal && !bVal) return -1;
+      if (!aVal && bVal) return 1;
+      return (a.name || '').localeCompare(b.name || '');
+    });
     el.innerHTML=`
       <div style="display:flex;gap:6px;margin-bottom:8px">
         <button class="btn btn-primary" style="flex:1;padding:8px;font-size:11px" onclick="openUserModal()">+ Add User</button>
@@ -38,8 +202,8 @@ async function showAdminUsers(){
           <thead><tr><th>Phone</th><th>Name</th><th>Role</th><th>Sites</th><th style="min-width:100px"></th></tr></thead>
           <tbody>
             ${(data||[]).map(u=>`<tr>
-              <td>${u.phone}</td><td>${u.name||'—'}</td>
-              <td><span class="badge badge-${u.role==='admin'?'red':u.role==='manager'?'blue':'green'}">${u.role}</span></td>
+              <td>${u.phone || '—'}</td><td>${u.name || '—'}</td>
+              <td><span class="badge badge-${u.role==='admin'?'red':u.role==='manager'?'blue':'green'}">${u.role || 'user'}</span></td>
               <td style="font-size:9px;max-width:80px;overflow:hidden;text-overflow:ellipsis">${(u.assigned_sites||[]).join(', ')}</td>
               <td style="white-space:nowrap">
                 <span style="color:var(--blue);cursor:pointer;font-size:10px" onclick="openUserModal('${u.id}')">Edit</span>
@@ -47,6 +211,7 @@ async function showAdminUsers(){
               </td>
             </tr>`).join('')}
           </tbody>
+          <tfoot><tr><td colspan="5" style="text-align:center;font-weight:bold;padding:8px">Total Users: ${(data||[]).length}</td></tr></tfoot>
         </table>
       </div>`;
   }catch(e){el.innerHTML=`<div class="error-box">Failed to load users: ${e?.message||e}</div>`;console.error('showAdminUsers error:',e);}

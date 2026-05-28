@@ -78,6 +78,8 @@ function buildBottomTabs(){
   if(session.role==='manager'||session.role==='admin')
     tabs.push({id:'insights',label:'Insights',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 16l4-4 4 4 4-8"/></svg>'});
   if(session.role==='admin')
+    tabs.push({id:'overview',label:'Overview',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>'});
+  if(session.role==='admin')
     tabs.push({id:'admin',label:'Admin',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197"/></svg>'});
   el.innerHTML=tabs.map(t=>`<div class="bottom-tab${t.id==='dgr'?' active':''}" data-tab="${t.id}" onclick="switchTab('${t.id}')">${t.icon}<span>${t.label}</span></div>`).join('');
   el.classList.remove('hidden');
@@ -95,5 +97,6 @@ function switchTab(tab){
   else if(tab==='approvals')showApprovals();
   else if(tab==='admin')showAdmin();
   else if(tab==='insights')showInsights();
+  else if(tab==='overview')showOverview();
 }
 

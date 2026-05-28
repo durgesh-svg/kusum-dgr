@@ -181,7 +181,7 @@ function startDGR(siteName){
     submitted_by_phone:session.phone,
     // Inverter
     inv_gen:new Array(n).fill(0),
-    inv_strings_count:new Array(n).fill(null).map((_,i)=>site&&Array.isArray(site.strings_per_inv)&&site.strings_per_inv[i]!=null?+site.strings_per_inv[i]:''),
+    inv_strings_count:new Array(n).fill(''),
     inv_modules_cleaned:new Array(n).fill(null).map(()=>({cleaned:'',total:''})),
     total_gen_kwh:0,
     // Performance
@@ -235,7 +235,7 @@ async function editSubmission(id){
       inverter_count:n,
       strings_per_inv:(data.inv_strings||site?.strings_per_inv||[]),
       inv_gen:Array.isArray(data.inv_gen)?data.inv_gen:new Array(n).fill(0),
-      inv_strings_count:Array.isArray(data.inv_strings_count)?data.inv_strings_count:new Array(n).fill(null).map((_,i)=>site&&Array.isArray(site.strings_per_inv)&&site.strings_per_inv[i]!=null?+site.strings_per_inv[i]:''),
+      inv_strings_count:Array.isArray(data.inv_strings_count)?data.inv_strings_count:new Array(n).fill(''),
       inv_modules_cleaned:Array.isArray(data.inv_modules_cleaned)?data.inv_modules_cleaned:new Array(n).fill(null).map(()=>({cleaned:'',total:''})),
       grid_outage_details:Array.isArray(data.grid_outage_details)?data.grid_outage_details:[],
       plant_outage_details:Array.isArray(data.plant_outage_details)?data.plant_outage_details:[],
@@ -457,9 +457,15 @@ function updateDCPerfDisplay(n){
     const dcEl=document.getElementById('s2dc'+i);
     const cufEl=document.getElementById('s2cuf'+i);
     const lossEl=document.getElementById('s2loss'+i);
+    // mobile elements
+    const mobDc=document.getElementById('s2mob_dc'+i);
+    const mobCuf=document.getElementById('s2mob_cuf'+i);
+    const mobLoss=document.getElementById('s2mob_loss'+i);
+    const mobSy=document.getElementById('s2mob_sy'+i);
     if(row){
       row.className='inv-row'+(p.isBest?' inv-row-best':p.isWorst?' inv-row-worst':'');
     }
+    // desktop updates
     if(dcEl)dcEl.textContent=p.dc>0?p.dc+' kW':'—';
     if(cufEl){
       if(p.dcCuf>0){
@@ -471,6 +477,11 @@ function updateDCPerfDisplay(n){
     if(lossEl)lossEl.innerHTML=getLossHtml(p.loss);
     const syEl=document.getElementById('s2sy'+i);
     if(syEl)syEl.textContent=p.dc>0?(p.kwh/p.dc).toFixed(2):'—';
+    // mobile updates
+    if(mobDc)mobDc.textContent=p.dc>0?p.dc+' kW':'—';
+    if(mobCuf)mobCuf.textContent=p.dcCuf>0?p.dcCuf+'%':'—';
+    if(mobLoss)mobLoss.innerHTML=getLossHtml(p.loss);
+    if(mobSy)mobSy.textContent=p.dc>0?(p.kwh/p.dc).toFixed(2):'—';
   });
 }
 
@@ -489,9 +500,9 @@ function onStringCount(idx,val){
     updateDCPerfDisplay(formData.inverter_count||1);
     return;
   }
-  if(v>26){
-    formData.inv_strings_count[idx]=26;
-    if(inp)inp.value=26;
+  if(v>30){
+    formData.inv_strings_count[idx]=30;
+    if(inp)inp.value=30;
     updateDCPerfDisplay(formData.inverter_count||1);
     return;
   }
@@ -507,7 +518,8 @@ function buildScreen2(){
   if(!formData.inv_gen||formData.inv_gen.length!==n)formData.inv_gen=new Array(n).fill(0);
   if(!formData.inv_modules_cleaned||formData.inv_modules_cleaned.length!==n)
     formData.inv_modules_cleaned=new Array(n).fill(null).map(()=>({cleaned:'',total:''}));
-  formData.inv_strings_count=new Array(n).fill('');
+  if(!Array.isArray(formData.inv_strings_count)||formData.inv_strings_count.length!==n)
+    formData.inv_strings_count=new Array(n).fill('');
   const dc=formData.dc_capacity_kw||0;
   const invKwp=dc>0&&n>0?dc/n:0;
   const dcPerf=calcDCPerf(n);
@@ -536,12 +548,20 @@ function buildScreen2(){
           onchange="onInvGen(${i},this.value)">
         <div class="inv-sy" id="s2sy${i}">${sy}</div>
         <div class="inv-per-str" id="s2ps${i}">${perStr}</div>
-        <input type="number" inputmode="numeric" min="1" max="26" id="s2sc${i}" value="" placeholder="—"
+        <input type="number" inputmode="numeric" min="1" max="30" id="s2sc${i}" value="${scVal||''}" placeholder="—"
           style="font-size:11px;padding:5px 4px;text-align:center"
           onchange="onStringCount(${i},this.value)">
         <div class="inv-dc-cap" id="s2dc${i}">${p.dc>0?p.dc+' kW':'—'}</div>
         <div class="inv-dc-cuf" id="s2cuf${i}">${cufHtml}</div>
         <div class="inv-loss" id="s2loss${i}">${getLossHtml(p.loss)}</div>
+        <!-- mobile stats strip -->
+        <div class="inv-stats-row" style="display:none" id="s2mob${i}">
+          <div class="inv-stat-item"><span class="inv-stat-label">kWh/kWp</span><span class="inv-stat-value" id="s2mob_sy${i}">${sy}</span></div>
+          <div class="inv-stat-item"><span class="inv-stat-label">kWh/str</span><span class="inv-stat-value" style="color:var(--gray)">${perStr}</span></div>
+          <div class="inv-stat-item"><span class="inv-stat-label">DC kW</span><span class="inv-stat-value" style="color:var(--blue)" id="s2mob_dc${i}">${p.dc>0?p.dc:'—'}</span></div>
+          <div class="inv-stat-item"><span class="inv-stat-label">DC CUF%</span><span class="inv-stat-value" style="color:var(--green-dark)" id="s2mob_cuf${i}">${p.dcCuf>0?p.dcCuf+'%':'—'}</span></div>
+          <div class="inv-stat-item"><span class="inv-stat-label">Loss</span><span class="inv-stat-value" id="s2mob_loss${i}">${getLossHtml(p.loss)}</span></div>
+        </div>
       </div>`;
   }
   const total=formData.inv_gen.reduce((a,b)=>a+(+b||0),0);

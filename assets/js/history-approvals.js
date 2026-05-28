@@ -90,8 +90,8 @@ async function renderApprovals(el,inAdmin){
           const flags=[];
           if((d.wti_c||0)>85||(d.oti_c||0)>85)flags.push('<span class="badge badge-red">High temp</span>');
           if((d.pr_pct||0)<70&&(d.pr_pct||0)>0)flags.push('<span class="badge badge-yellow">Low PR</span>');
-          const isReturned=d.status==='pending'&&!!(d.review_note&&String(d.review_note).trim());
-          const statusLabel=isReturned?'returned':d.status;
+          const isReturned=d.status==='rejected';
+          const statusLabel=d.status;
           const approveF=inAdmin?'approveAndRefreshAdmin':'approveSubmission';
           const rejectF=inAdmin?'rejectAndRefreshAdmin':'rejectSubmission';
           return `<div class="approval-card">
@@ -121,8 +121,15 @@ async function approveSubmission(id){
 }
 async function rejectSubmission(id){
   showRejectModal(id, async(note)=>{
-    await sb.from('dgr_submissions').update({status:'pending',reviewed_by:session.name,review_note:note,reviewed_at:new Date().toISOString()}).eq('id',id);
-    showApprovals();
+    try{
+      console.log('Rejecting submission', id, 'with note:', note);
+      await sb.from('dgr_submissions').update({status:'rejected',reviewed_by:session.name,review_note:note,reviewed_at:new Date().toISOString()}).eq('id',id);
+      console.log('Rejection successful for', id);
+      showApprovals();
+    }catch(e){
+      showToast('Failed to reject: '+e.message, 'error');
+      console.error('Reject error:',e);
+    }
   });
 }
 async function approveAndRefreshAdmin(id){
@@ -131,8 +138,15 @@ async function approveAndRefreshAdmin(id){
 }
 async function rejectAndRefreshAdmin(id){
   showRejectModal(id, async(note)=>{
-    await sb.from('dgr_submissions').update({status:'pending',reviewed_by:session.name,review_note:note,reviewed_at:new Date().toISOString()}).eq('id',id);
-    showApprovalInAdmin();
+    try{
+      console.log('Admin rejecting submission', id, 'with note:', note);
+      await sb.from('dgr_submissions').update({status:'rejected',reviewed_by:session.name,review_note:note,reviewed_at:new Date().toISOString()}).eq('id',id);
+      console.log('Admin rejection successful for', id);
+      showApprovalInAdmin();
+    }catch(e){
+      showToast('Failed to reject: '+e.message, 'error');
+      console.error('Reject error:',e);
+    }
   });
 }
 

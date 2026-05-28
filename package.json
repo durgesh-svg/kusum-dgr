@@ -1,0 +1,8 @@
+{
+  "name": "kusum-dgr",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "live-server --port=7925 --entry-file=dgr.html --no-browser",
+    "start": "live-server --port=7925 --entry-file=dgr.html"
+  }
+}
