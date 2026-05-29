@@ -4,9 +4,10 @@
 // Admin only
 // ─────────────────────────────────────────────────────────────
 
-const CUTOFF_HOUR = 20; // 8 PM cutoff
+const CUTOFF_HOUR = 21; // 9 PM cutoff
 const OV_PAGE_SIZE = 25;
 let ovActiveTab = 'compliance';
+let ovAutoRefreshTimer = null;
 let ovComplianceRows = [];
 let ovEngineerRows = [];
 let ovPerfRows = [];
@@ -41,6 +42,11 @@ async function showOverview() {
   el.innerHTML = `<div style="text-align:center;padding:60px;color:var(--gray)">Loading Overview...</div>`;
   const def = getDefaultDates();
   await renderOverview('', def.from, def.to);
+  // Auto-refresh every 5 minutes
+  if (ovAutoRefreshTimer) clearInterval(ovAutoRefreshTimer);
+  ovAutoRefreshTimer = setInterval(() => {
+    if (currentTab === 'overview') applyOvFilters();
+  }, 5 * 60 * 1000);
 }
 
 async function renderOverview(filterSite = '', filterFrom = '', filterTo = '') {
@@ -79,7 +85,6 @@ async function renderOverview(filterSite = '', filterFrom = '', filterTo = '') {
   const avgPr = avg(ovAllRows.filter(r => r.pr_pct > 0).map(r => +r.pr_pct));
 
   // Missing DGR today — separate query (no date range / site filter)
-  // so we accurately know which sites engineer has NOT submitted today at all
   const today = todayLocal();
   const { data: todayRows } = await sb.from('dgr_submissions')
     .select('site_name')
@@ -87,60 +92,75 @@ async function renderOverview(filterSite = '', filterFrom = '', filterTo = '') {
   const submittedToday = new Set((todayRows || []).map(r => r.site_name));
   const missingSites = siteList.filter(s => !submittedToday.has(s));
 
+  // Fetch engineers and their assigned sites to show who hasn't submitted
+  const { data: engineers } = await sb.from('users')
+    .select('name, phone, assigned_sites')
+    .eq('role', 'engineer');
+  // Map: site → engineer name
+  const siteEngineerMap = {};
+  (engineers || []).forEach(eng => {
+    (eng.assigned_sites || []).forEach(site => {
+      siteEngineerMap[site] = eng.name || eng.phone;
+    });
+  });
+  // Group missing sites by engineer
+  const missingByEng = {};
+  missingSites.forEach(site => {
+    const eng = siteEngineerMap[site] || 'Unassigned';
+    if (!missingByEng[eng]) missingByEng[eng] = [];
+    missingByEng[eng].push(site);
+  });
+
   // Build site filter opts
   const siteOpts = `<option value="">All Sites</option>` + siteList.map(s => `<option value="${s}" ${s === filterSite ? 'selected' : ''}>${s}</option>`).join('');
 
   el.innerHTML = `
     <div style="padding-bottom:80px">
-      <!-- Header -->
-      <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:12px">Overview</div>
 
-      <!-- Filters -->
-      <div class="card" style="margin-bottom:12px">
-        <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end">
-          <div style="flex:2;min-width:120px">
-            <label>Site</label>
-            <select id="ovSite" onchange="applyOvFilters()" style="padding:7px 10px;font-size:12px">${siteOpts}</select>
-          </div>
-          <div style="flex:1;min-width:110px">
-            <label>From</label>
-            <input type="date" id="ovFrom" value="${filterFrom}" onchange="applyOvFilters()" style="padding:7px;font-size:12px">
-          </div>
-          <div style="flex:1;min-width:110px">
-            <label>To</label>
-            <input type="date" id="ovTo" value="${filterTo}" onchange="applyOvFilters()" style="padding:7px;font-size:12px">
-          </div>
-          <button class="btn btn-secondary" onclick="applyOvFilters()" style="padding:8px 14px;font-size:12px">🔄 Refresh</button>
+      <!-- Header + Filter inline -->
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-wrap:wrap">
+        <div style="flex:1;min-width:140px">
+          <div style="font-size:14px;font-weight:800;color:var(--text)">📊 Overview</div>
+          <div style="font-size:9px;color:var(--text-muted)">${filterFrom} → ${filterTo}</div>
         </div>
+        <select id="ovSite" onchange="applyOvFilters()" style="flex:2;min-width:100px;padding:5px 8px;font-size:11px;border:1.5px solid var(--border);border-radius:7px">${siteOpts}</select>
+        <input type="date" id="ovFrom" value="${filterFrom}" onchange="applyOvFilters()" style="flex:1;min-width:90px;padding:5px 6px;font-size:11px;border:1.5px solid var(--border);border-radius:7px">
+        <input type="date" id="ovTo" value="${filterTo}" onchange="applyOvFilters()" style="flex:1;min-width:90px;padding:5px 6px;font-size:11px;border:1.5px solid var(--border);border-radius:7px">
+        <button onclick="applyOvFilters()" style="padding:5px 10px;font-size:12px;border:1.5px solid var(--border);border-radius:7px;background:#fff;cursor:pointer">🔄</button>
       </div>
 
       <!-- Missing DGR Alert -->
       ${missingSites.length > 0 ? `
-      <div class="card" style="margin-bottom:12px;border-left:4px solid var(--red);background:var(--red-light)">
-        <div style="font-size:12px;font-weight:700;color:var(--red);margin-bottom:6px">⚠️ ${missingSites.length} Sites — DGR Not Submitted Today (${today})</div>
-        <div style="display:flex;flex-wrap:wrap;gap:5px">
-          ${missingSites.map(s => `<span style="background:#fff;color:var(--red);font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;border:1px solid var(--red-border)">${s}</span>`).join('')}
+      <div style="margin-bottom:8px;border-radius:10px;overflow:hidden;border:1.5px solid var(--red-border)">
+        <div style="background:var(--red);padding:6px 12px;display:flex;align-items:center;justify-content:space-between">
+          <div style="color:#fff;font-size:12px;font-weight:700">🚨 ${missingSites.length} Sites Pending · ${Object.keys(missingByEng).length} Engineers</div>
+          <div style="color:rgba(255,255,255,.8);font-size:10px">${today}</div>
+        </div>
+        <div style="background:var(--red-light);max-height:120px;overflow-y:auto;-webkit-overflow-scrolling:touch">
+          ${Object.entries(missingByEng).map(([eng, engSites]) => `
+            <div style="display:flex;align-items:center;gap:8px;padding:4px 10px;border-bottom:1px solid var(--red-border)">
+              <div style="width:18px;height:18px;border-radius:50%;background:var(--red);color:#fff;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;flex-shrink:0">${eng.charAt(0).toUpperCase()}</div>
+              <div style="font-size:11px;font-weight:700;color:var(--text);min-width:100px;flex-shrink:0">${eng}</div>
+              <div style="display:flex;flex-wrap:wrap;gap:3px;flex:1">
+                ${engSites.map(s => `<span style="background:#fff;color:var(--red);font-size:9px;font-weight:600;padding:1px 6px;border-radius:20px;border:1px solid var(--red-border)">${s}</span>`).join('')}
+              </div>
+            </div>`).join('')}
         </div>
       </div>` : `
-      <div class="card" style="margin-bottom:12px;border-left:4px solid var(--green);background:var(--green-light)">
-        <div style="font-size:12px;font-weight:700;color:var(--green-dark)">✅ All sites submitted DGR today</div>
+      <div style="margin-bottom:8px;border-radius:10px;overflow:hidden;border:1.5px solid var(--green-border)">
+        <div style="background:var(--green);padding:6px 12px;display:flex;align-items:center;gap:6px">
+          <span>✅</span><div style="color:#fff;font-size:12px;font-weight:700">All Sites Submitted DGR Today</div>
+        </div>
       </div>`}
 
-      <!-- KPI Cards -->
-      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:8px">
-        ${kpiCard('Total Reports', total, 'var(--blue)')}
-        ${kpiCard('On-Time Rate', compliancePct + '%', compliancePct >= 80 ? 'var(--green-dark)' : compliancePct >= 60 ? 'var(--orange)' : 'var(--red)')}
-        ${kpiCard('Avg DC CUF%', avgDcCuf + '%', 'var(--primary)')}
-        ${kpiCard('Avg PR%', avgPr + '%', avgPr !== '—' && avgPr < 75 ? 'var(--red)' : 'var(--green-dark)')}
-        ${kpiCard('On Time', onTime, 'var(--green-dark)')}
-        ${kpiCard('Late Submissions', late, late > 0 ? 'var(--red)' : 'var(--green-dark)')}
-      </div>
-
-      <!-- Total Generation -->
-      <div class="card" style="margin-bottom:12px;text-align:center;padding:14px">
-        <div style="font-size:10px;color:var(--gray);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Total Generation</div>
-        <div style="font-size:28px;font-weight:800;color:var(--primary)">${(totalGen / 1000).toFixed(1)} MWh</div>
-        <div style="font-size:11px;color:var(--gray)">${totalGen.toLocaleString('en-IN')} kWh across ${total} reports</div>
+      <!-- KPI Grid — 3 cols with sub-text -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px">
+        ${kpiCard2('⚡','Generation',(totalGen/1000).toFixed(1)+' MWh','var(--primary)',totalGen.toLocaleString('en-IN')+' kWh')}
+        ${kpiCard2('⏱','On-Time',compliancePct+'%',compliancePct>=80?'var(--green-dark)':compliancePct>=60?'var(--orange)':'var(--red)',onTime+' / '+total+' reports')}
+        ${kpiCard2('📊','Avg PR%',avgPr+'%',avgPr!=='—'&&avgPr<75?'var(--red)':'var(--green-dark)',avgPr>=75?'Good':'Below target')}
+        ${kpiCard2('☀️','DC CUF%',avgDcCuf+'%','var(--primary)','Capacity utilization')}
+        ${kpiCard2('✅','On Time',onTime,'var(--green-dark)',compliancePct+'% compliance')}
+        ${kpiCard2('🕐','Late',late,late>0?'var(--red)':'var(--green-dark)',late>0?'Need attention':'All good')}
       </div>
 
       <!-- Sub Tabs -->
@@ -196,10 +216,15 @@ async function renderOverview(filterSite = '', filterFrom = '', filterTo = '') {
           <div style="position:relative;height:200px"><canvas id="chartDailyGen"></canvas></div>
         </div>
 
-        <!-- Site Comparison Chart -->
+        <!-- Site Comparison Chart — collapsible -->
         <div class="card" style="margin-bottom:10px">
-          <div class="card-title" style="margin-bottom:8px">Site Comparison — Avg PR%</div>
-          <div style="position:relative;height:${Math.min(40 * Object.keys(ovSitePerf).length + 40, 400)}px"><canvas id="chartSiteComp"></canvas></div>
+          <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer" onclick="toggleSiteChart()">
+            <div class="card-title" style="margin-bottom:0">Site Comparison — DC CUF%</div>
+            <span id="siteChartToggleIcon" style="font-size:14px;color:var(--gray)">▼</span>
+          </div>
+          <div id="siteChartWrap" style="margin-top:8px">
+            <div style="position:relative;height:${Math.min(28 * Object.keys(ovSitePerf).length + 30, 360)}px"><canvas id="chartSiteComp"></canvas></div>
+          </div>
         </div>
 
         <!-- Site Performance Table -->
@@ -236,9 +261,16 @@ async function renderOverview(filterSite = '', filterFrom = '', filterTo = '') {
 
 // ── KPI Card Helper ───────────────────────────────────────────
 function kpiCard(label, value, color) {
-  return `<div class="card" style="text-align:center;padding:12px">
-    <div style="font-size:10px;color:var(--gray);text-transform:uppercase;letter-spacing:.05em">${label}</div>
-    <div style="font-size:22px;font-weight:800;color:${color}">${value}</div>
+  return `<div class="card" style="text-align:center;padding:10px 6px">
+    <div style="font-size:9px;color:var(--text-muted);font-weight:600;margin-bottom:4px">${label}</div>
+    <div style="font-size:16px;font-weight:800;color:${color};line-height:1">${value}</div>
+  </div>`;
+}
+function kpiCard2(icon, label, value, color, sub) {
+  return `<div class="card" style="padding:9px 8px;border-left:3px solid ${color}">
+    <div style="font-size:9px;color:var(--text-muted);font-weight:600;margin-bottom:3px">${icon} ${label}</div>
+    <div style="font-size:17px;font-weight:800;color:${color};line-height:1.1">${value}</div>
+    <div style="font-size:8px;color:var(--text-muted);margin-top:3px">${sub}</div>
   </div>`;
 }
 
@@ -424,16 +456,27 @@ function buildDailyGenChart(rows) {
 function buildSiteCompChart(sitePerf) {
   const canvas = document.getElementById('chartSiteComp');
   if (!canvas || typeof Chart === 'undefined') return;
-  const avg = arr => arr.length ? +(arr.reduce((a, b) => a + b, 0) / arr.length).toFixed(2) : 0;
-  const entries = Object.entries(sitePerf).map(([site, p]) => ({ site, pr: avg(p.prs) })).sort((a, b) => b.pr - a.pr);
+  const avg = arr => arr.filter(v => v > 0).length ? +(arr.filter(v => v > 0).reduce((a, b) => a + b, 0) / arr.filter(v => v > 0).length).toFixed(2) : 0;
+  const entries = Object.entries(sitePerf).map(([site, p]) => ({ site, val: avg(p.dcCufs || []) })).sort((a, b) => b.val - a.val);
+  if (ovCharts.siteComp) { ovCharts.siteComp.destroy(); }
   ovCharts.siteComp = new Chart(canvas, {
     type: 'bar',
     data: {
       labels: entries.map(e => e.site),
-      datasets: [{ label: 'Avg PR%', data: entries.map(e => e.pr), backgroundColor: entries.map(e => e.pr >= 75 ? 'rgba(22,163,74,.7)' : 'rgba(185,28,28,.7)'), borderRadius: 4 }]
+      datasets: [{ label: 'DC CUF%', data: entries.map(e => e.val), backgroundColor: entries.map(e => e.val >= 20 ? 'rgba(22,163,74,.7)' : e.val >= 12 ? 'rgba(234,88,12,.7)' : 'rgba(185,28,28,.7)'), borderRadius: 4 }]
     },
-    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { min: 0, max: 100, ticks: { font: { size: 9 } } }, y: { ticks: { font: { size: 9 } } } } }
+    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ` DC CUF%: ${ctx.parsed.x}%` } } }, scales: { x: { min: 0, ticks: { font: { size: 9 } } }, y: { ticks: { font: { size: 9 } } } } }
   });
+}
+
+function toggleSiteChart() {
+  const wrap = document.getElementById('siteChartWrap');
+  const icon = document.getElementById('siteChartToggleIcon');
+  if (!wrap) return;
+  const hidden = wrap.style.display === 'none';
+  wrap.style.display = hidden ? 'block' : 'none';
+  if (icon) icon.textContent = hidden ? '▼' : '▶';
+  if (hidden && !ovCharts.siteComp) buildSiteCompChart(ovSitePerf);
 }
 
 // ── Inverter Health Drill-down ────────────────────────────────
