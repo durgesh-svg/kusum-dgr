@@ -26,6 +26,14 @@ async function showHomeScreen(){
     todaySubmissions={};
     if(data)data.forEach(d=>{todaySubmissions[d.site_name]=d;});
   }catch(e){}
+
+  // Fetch active field visit for this engineer
+  let activeVisit=null;
+  try{
+    const{data:vd}=await sb.from('field_visits').select('*').eq('engineer_phone',session.phone).is('check_out_at',null).order('check_in_at',{ascending:false}).limit(1);
+    if(vd&&vd.length>0)activeVisit=vd[0];
+  }catch(e){}
+
   let approved=0,pending=0,notDone=0;
   mySites.forEach(s=>{
     const sub=todaySubmissions[s.site_name];
@@ -53,6 +61,25 @@ async function showHomeScreen(){
         </div>
         <button class="home-logout" onclick="logout()">Logout</button>
       </div>
+    </div>
+    <!-- Field Visit Check In/Out -->
+    <div style="padding:0 14px;margin-bottom:0">
+      ${activeVisit ? `
+      <div style="background:#f0fdf4;border:1.5px solid var(--green-border);border-radius:10px;padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px">
+        <div>
+          <div style="font-size:10px;color:var(--green-dark);font-weight:700;text-transform:uppercase;letter-spacing:.05em">🟢 Checked In</div>
+          <div style="font-size:13px;font-weight:700;color:var(--text);margin-top:2px">${activeVisit.site_name}</div>
+          <div style="font-size:10px;color:var(--gray);margin-top:1px">Since ${new Date(activeVisit.check_in_at).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}</div>
+        </div>
+        <button onclick="doCheckOut('${activeVisit.id}')" class="btn btn-primary" style="padding:8px 14px;font-size:12px;white-space:nowrap">Check Out</button>
+      </div>` : `
+      <div style="background:#fff;border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px">
+        <div>
+          <div style="font-size:10px;color:var(--gray);font-weight:700;text-transform:uppercase;letter-spacing:.05em">📍 Field Visit</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:2px">Arrived at a site? Check in</div>
+        </div>
+        <button onclick="showCheckInModal()" class="btn btn-secondary" style="padding:8px 14px;font-size:12px;white-space:nowrap">Check In</button>
+      </div>`}
     </div>
     <div class="home-progress">
       <div class="home-progress-top">
@@ -438,8 +465,11 @@ function getLossHtml(loss){
 function getLossEmoji(loss){
   if(loss===null||!isFinite(loss)||loss<0)return'';
   const v=+loss;
+  if(v===0)return'✅';
   if(v<=4)return'✅';
-  return'🔹';
+  if(v<=8)return'⚠️';
+  if(v<=15)return'🔴';
+  return'🔴';
 }
 function getLossLabel(loss){
   if(loss===null||!isFinite(loss)||loss<0)return'';
@@ -1330,7 +1360,15 @@ Remarks :- ${formData.remarks||'—'}
 
 Submitted by :- ${formData.submitted_by_name}${lossSummary}${bestLine}
 
-🔴 ✅ 🔹`;
+✅ Normal  ⚠️ High Loss  🔴 Critical / Zero`;
 }
-function shareWhatsApp(){window.open('https://wa.me/?text='+encodeURIComponent(buildWhatsAppMsg()),'_blank');}
+function shareWhatsApp(){
+  const encoded=encodeURIComponent(buildWhatsAppMsg());
+  if(/Android|iPhone|iPad/i.test(navigator.userAgent)){
+    // Open WhatsApp app directly — no Chrome middleman
+    window.location.href='whatsapp://send?text='+encoded;
+  } else {
+    window.open('https://wa.me/?text='+encoded,'_blank');
+  }
+}
 function escHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
