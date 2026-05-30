@@ -14,6 +14,12 @@
 <link rel="stylesheet" href="assets/css/dgr.css">
 </head>
 <body>
+<!-- SPLASH SCREEN -->
+<div id="splashScreen" style="position:fixed;inset:0;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;transition:opacity 0.5s ease">
+  <img src="/assets/icons/icon-512.png" id="splashLogo" alt="Logo" style="width:150px;height:150px;border-radius:28px;opacity:0;transform:scale(0.6);transition:transform 0.6s cubic-bezier(.34,1.56,.64,1),opacity 0.5s ease">
+  <div style="margin-top:18px;font-size:17px;font-weight:800;color:#1e3a8a;font-family:'Space Grotesk',sans-serif;opacity:0;transition:opacity 0.5s ease 0.4s" id="splashTitle">STOCKWELL SOLAR</div>
+  <div style="font-size:11px;color:#64748b;margin-top:4px;letter-spacing:.08em;opacity:0;transition:opacity 0.5s ease 0.6s" id="splashSub">DGR PORTAL</div>
+</div>
 <div id="offlineBanner" class="offline-banner">No internet — submissions will be saved locally</div>
 <!-- LOGIN -->
 <div id="loginScreen" class="login-screen">

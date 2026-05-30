@@ -1,6 +1,28 @@
 window.addEventListener('online',()=>{document.getElementById('offlineBanner').classList.remove('show');syncQueue();});
 window.addEventListener('offline',()=>{document.getElementById('offlineBanner').classList.add('show');});
 
+// SPLASH SCREEN — logo animation 2 sec
+(function(){
+  const logo  = document.getElementById('splashLogo');
+  const title = document.getElementById('splashTitle');
+  const sub   = document.getElementById('splashSub');
+  const splash= document.getElementById('splashScreen');
+  if(!splash) return;
+  // Trigger animation after a tiny delay so CSS transition fires
+  requestAnimationFrame(()=>{
+    requestAnimationFrame(()=>{
+      if(logo){logo.style.opacity='1';logo.style.transform='scale(1)';}
+      if(title)title.style.opacity='1';
+      if(sub)sub.style.opacity='1';
+    });
+  });
+  // Hide after 2.2 seconds
+  setTimeout(()=>{
+    splash.style.opacity='0';
+    setTimeout(()=>{ if(splash)splash.style.display='none'; },500);
+  },2200);
+})();
+
 // SERVICE WORKER
 if('serviceWorker' in navigator){
   const swCode=`
