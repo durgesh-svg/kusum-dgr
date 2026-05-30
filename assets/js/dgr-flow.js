@@ -573,12 +573,12 @@ function buildScreen2(){
     rows+=`
       <div class="inv-row${rowCls}" id="invRow${i}">
         <div class="inv-num${isZero?' err':''}">${i+1}</div>
-        <input type="number" inputmode="decimal" value="${gen||''}" placeholder="0"
+        <input type="number" inputmode="decimal" value="${gen||''}" placeholder="Enter kWh"
           class="${isZero?'input-err':''}" style="font-size:12px;padding:6px 8px"
           onchange="onInvGen(${i},this.value)">
         <div class="inv-sy" id="s2sy${i}">${sy}</div>
         <div class="inv-per-str" id="s2ps${i}">${perStr}</div>
-        <input type="number" inputmode="numeric" min="1" max="30" id="s2sc${i}" value="${scVal||''}" placeholder="—"
+        <input type="number" inputmode="numeric" min="1" max="30" id="s2sc${i}" value="${scVal||''}" placeholder="Strings"
           style="font-size:11px;padding:5px 4px;text-align:center"
           onchange="onStringCount(${i},this.value)">
         <div class="inv-dc-cap" id="s2dc${i}">${p.dc>0?p.dc+' kW':'—'}</div>
