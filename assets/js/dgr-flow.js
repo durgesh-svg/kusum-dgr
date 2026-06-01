@@ -27,6 +27,31 @@ async function showHomeScreen(){
     if(data)data.forEach(d=>{todaySubmissions[d.site_name]=d;});
   }catch(e){}
 
+  // Fetch rejected submissions from last 7 days (Needs Attention)
+  let rejectedItems=[];
+  try{
+    const since=new Date();since.setDate(since.getDate()-7);
+    const sinceStr=since.toISOString().split('T')[0];
+    const mySiteNames=mySites.map(s=>s.site_name);
+    if(mySiteNames.length){
+      const{data:rj}=await sb.from('dgr_submissions')
+        .select('id,site_name,report_date,review_note,reviewed_by,status')
+        .eq('status','rejected')
+        .in('site_name',mySiteNames)
+        .gte('report_date',sinceStr)
+        .order('report_date',{ascending:false});
+      rejectedItems=rj||[];
+    }
+  }catch(e){}
+
+  // Parse display note for each rejected item (review_note may be JSON)
+  rejectedItems=rejectedItems.map(r=>{
+    let dn=r.review_note||'';
+    try{const p=JSON.parse(dn);dn=p.general||(Object.keys(p).filter(k=>k!=='general').length>0?`${Object.keys(p).filter(k=>k!=='general').length} field(s) flagged`:'');}
+    catch(e){}
+    return{...r,_dn:dn||'Rejected'};
+  });
+
   // Fetch active field visit for this engineer
   let activeVisit=null;
   try{
@@ -50,6 +75,20 @@ async function showHomeScreen(){
     const sub=todaySubmissions[s.site_name];
     return getHomeSiteCategory(sub)===homeSiteFilter;
   });
+
+  const needsAttentionHtml=rejectedItems.length>0?`
+    <div style="margin:8px 14px 0">
+      <div style="font-size:10px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">⚠️ Needs Attention</div>
+      ${rejectedItems.map(r=>`
+        <div onclick="editSubmission('${r.id}')" style="background:var(--red-light);border:1.5px solid var(--red-border);border-radius:10px;padding:10px 14px;margin-bottom:6px;cursor:pointer">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:13px;font-weight:700;color:var(--text)">${escHtml(r.site_name)}</span>
+            <span style="font-size:10px;color:var(--red);font-weight:600">${new Date(r.report_date+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'})}</span>
+          </div>
+          <div style="font-size:11px;color:var(--red);margin-top:4px">❌ ${escHtml(r._dn||'No reason given')} — by ${escHtml(r.reviewed_by||'Admin')}</div>
+          <div style="font-size:10px;color:var(--red);margin-top:3px;font-weight:500">Tap to edit &amp; resubmit →</div>
+        </div>`).join('')}
+    </div>` : '';
 
   el.innerHTML=`
     <div class="home-header">
@@ -104,30 +143,48 @@ async function showHomeScreen(){
       </div>
       ${show5Day?await build5DayPanel(mySites):''}
     </div>
+    ${needsAttentionHtml}
     <div style="font-size:10px;font-weight:600;color:var(--gray);text-transform:uppercase;letter-spacing:.06em;padding:12px 14px 4px">Your Sites</div>
     <div style="padding:0 14px 80px">
     ${filteredSites.map(s=>{
       const sub=todaySubmissions[s.site_name];
-      const isReturned=sub&&sub.status==='pending'&&!!(sub.review_note&&String(sub.review_note).trim());
+      const isRejected=sub&&(sub.status==='rejected'||(sub.status==='pending'&&!!(sub.review_note&&String(sub.review_note).trim())));
       let iconCls='site-icon-todo',iconHtml='<span class="material-symbols-outlined" style="font-size:20px;color:var(--gray)">solar_power</span>';
       let badgeHtml=`<span class="badge badge-gray">Fill now →</span>`;
       if(sub&&sub.status==='approved'){
         iconCls='site-icon-ok';
         iconHtml='<span class="material-symbols-outlined" style="font-size:20px;color:#16a34a;font-variation-settings:\'FILL\' 1">check_circle</span>';
         badgeHtml='<span class="badge badge-green">Approved</span>';
+      } else if(isRejected){
+        iconCls='site-icon-pending';
+        iconHtml='<span class="material-symbols-outlined" style="font-size:20px;color:var(--red)">cancel</span>';
+        badgeHtml='<span class="badge badge-red">Rejected</span>';
       } else if(sub){
         iconCls='site-icon-pending';
         iconHtml='<span class="material-symbols-outlined" style="font-size:20px;color:#a16207">schedule</span>';
-        badgeHtml=isReturned?'<span class="badge badge-yellow">Returned</span>':'<span class="badge badge-yellow">Pending</span>';
+        badgeHtml='<span class="badge badge-yellow">Pending</span>';
       }
       const cap=s.dc_capacity_kw?`${s.dc_capacity_kw} kW · ${s.inverter_count||'?'} inv`:'Not configured';
-      return `<div class="site-card-new" onclick="${isReturned?`editSubmission('${sub.id}')`:`startDGR('${s.site_name}')`}">
-        <div class="site-icon ${iconCls}">${iconHtml}</div>
-        <div class="site-card-info">
-          <div class="site-card-name">${s.site_name}</div>
-          <div class="site-card-cap">${cap}</div>
+      let rejNote='';
+      if(isRejected&&sub.review_note){
+        const _raw=String(sub.review_note);
+        try{const _p=JSON.parse(_raw);rejNote=_p.general||(Object.keys(_p).filter(k=>k!=='general').length>0?`${Object.keys(_p).filter(k=>k!=='general').length} field(s) flagged`:'');}
+        catch(e){rejNote=_raw;}
+      }
+      const rejBy=isRejected&&sub.reviewed_by?String(sub.reviewed_by):'Admin';
+      return `<div style="margin-bottom:10px">
+        <div class="site-card-new" style="${isRejected?'border:1.5px solid var(--red-border);border-radius:12px 12px '+(rejNote?'0 0':'12px 12px')+';margin-bottom:0':''}" onclick="${isRejected?`editSubmission('${sub.id}')`:`startDGR('${s.site_name}')`}">
+          <div class="site-icon ${iconCls}">${iconHtml}</div>
+          <div class="site-card-info">
+            <div class="site-card-name">${s.site_name}</div>
+            <div class="site-card-cap">${cap}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:4px">${badgeHtml}<span class="material-symbols-outlined" style="font-size:18px;color:var(--gray)">chevron_right</span></div>
         </div>
-        <div style="display:flex;align-items:center;gap:4px">${badgeHtml}<span class="material-symbols-outlined" style="font-size:18px;color:var(--gray)">chevron_right</span></div>
+        ${rejNote?`<div onclick="editSubmission('${sub.id}')" style="background:var(--red-light);border:1.5px solid var(--red-border);border-top:none;border-radius:0 0 12px 12px;padding:8px 14px;cursor:pointer">
+          <div style="font-size:11px;color:var(--red);font-weight:600">❌ ${escHtml(rejNote)} — by ${escHtml(rejBy)}</div>
+          <div style="font-size:10px;color:var(--red);margin-top:3px;font-weight:500">Tap to edit &amp; resubmit →</div>
+        </div>`:''}
       </div>`;
     }).join('')}
     ${mySites.length===0?'<div class="card" style="text-align:center;color:var(--gray);padding:20px">No sites assigned. Contact your admin.</div>':''}
@@ -231,6 +288,9 @@ function startDGR(siteName){
     cleaning_c3_status:'not-started',cleaning_c3_tds:null,
     modules_cleaned_today:null,modules_total:null,
     // Weather
+    // Rejection flags — cleared for fresh DGR
+    _isRejectedEdit:false,_rejectionNote:'',_reviewedBy:'',
+    // Weather
     weather:'',
     rain:false,rain_intensity:'',rain_modules_cleaned:false,
     weather_avg_ambient_c:null,weather_max_ambient_c:null,
@@ -277,9 +337,16 @@ async function editSubmission(id){
     photoFiles={};
     acknowledgements={inv_zero:false,pr_low:false,temp_high:false};
 
-    if(formData.status==='pending' && formData.review_note){
-      alert(`Returned for correction:\n${String(formData.review_note)}`);
-    }
+    // Flag rejection edit mode — shown as locked banner in Screen 1
+    const wasRejected = data.status==='rejected' || (data.status==='pending' && !!(data.review_note && String(data.review_note).trim()));
+    const _fNotes = wasRejected ? getFieldNotes(data.review_note) : {};
+    const _flaggedCount = Object.keys(_fNotes).filter(k=>k!=='general').length;
+    formData._isRejectedEdit = wasRejected;
+    formData._fieldNotes     = _fNotes;
+    formData._rejectionNote  = wasRejected
+      ? (_fNotes.general || (_flaggedCount>0 ? `${_flaggedCount} specific field${_flaggedCount>1?'s':''} flagged` : (data.review_note||'')))
+      : '';
+    formData._reviewedBy     = wasRejected ? (data.reviewed_by||'Admin') : '';
 
     switchTab('dgr');
     goToScreen(1);
@@ -367,25 +434,68 @@ function goToScreen(n){
   window.scrollTo(0,0);
 }
 function goBack(){if(currentScreen>1)goToScreen(currentScreen-1);else switchTab('dgr');}
-function goNext(){if(currentScreen===9){submitReport();return;}if(currentScreen<10)goToScreen(currentScreen+1);}
+function goNext(){
+  if(currentScreen===1){
+    // Time restriction: block today before 6 PM (Feature 1)
+    const todayStr=new Date().toISOString().split('T')[0];
+    if(formData.report_date===todayStr && new Date().getHours()<18){
+      const banner=document.getElementById('s1TimeBanner');
+      if(banner){banner.style.outline='2px solid var(--red)';banner.scrollIntoView({behavior:'smooth',block:'center'});}
+      return;
+    }
+  }
+  if(currentScreen===9){submitReport();return;}
+  if(currentScreen<10)goToScreen(currentScreen+1);
+}
 // SCREEN 1: SITE & DATE
 function buildScreen1(){
   const el=document.getElementById('screen1');
   const mySites=session.role==='engineer'?sites.filter(s=>session.assigned_sites.includes(s.site_name)):sites;
-  const site=sites.find(s=>s.site_name===formData.site_name);
+
+  // ── Time restriction check (Feature 1) ────────────────────────────────────
+  const todayStr=new Date().toISOString().split('T')[0];
+  const isToday=formData.report_date===todayStr;
+  const nowHour=new Date().getHours();
+  const nowMin=new Date().getMinutes();
+  const timeBlocked=isToday&&nowHour<18;
+  const timeStr=`${String(nowHour).padStart(2,'0')}:${String(nowMin).padStart(2,'0')}`;
+
+  // ── Rejection edit mode (Feature 3) ──────────────────────────────────────
+  const isRejEdit=!!(formData._isRejectedEdit);
+  const rejNote=formData._rejectionNote||'';
+  const rejBy=formData._reviewedBy||'Admin';
+  const rejFieldCount=Object.keys(formData._fieldNotes||{}).filter(k=>k!=='general').length;
+
   el.innerHTML=`
+    ${isRejEdit?`
+    <div style="background:var(--red-light);border:1.5px solid var(--red-border);border-radius:10px;padding:10px 14px;margin-bottom:10px">
+      <div style="font-size:12px;font-weight:700;color:var(--red);margin-bottom:4px">❌ Rejected by ${escHtml(rejBy)}</div>
+      ${rejNote?`<div style="font-size:12px;color:var(--red)">${escHtml(rejNote)}</div>`:''}
+      ${rejFieldCount>0?`<div style="font-size:11px;color:var(--red);margin-top:4px">📌 ${rejFieldCount} specific field${rejFieldCount>1?'s':''} flagged — highlighted on inverter screen</div>`:''}
+      <div style="font-size:10px;color:var(--red);margin-top:6px;font-weight:500">Edit the report below and resubmit →</div>
+    </div>`:''}
+    ${timeBlocked?`
+    <div id="s1TimeBanner" style="background:var(--red-light);border:1.5px solid var(--red-border);border-radius:10px;padding:10px 14px;margin-bottom:10px">
+      <div style="font-size:12px;font-weight:700;color:var(--red);margin-bottom:2px">⏰ Submission not allowed yet</div>
+      <div style="font-size:11px;color:var(--red)">DGR for today can only be submitted after 6:00 PM</div>
+      <div style="font-size:10px;color:var(--red);margin-top:4px">Current time: ${timeStr} · Select a past date to submit earlier</div>
+    </div>`:''}
     <div class="card">
       <div class="card-title">Site details</div>
       <div style="margin-bottom:8px">
         <label>Site name</label>
-        <select id="s1Site" class="${formData.site_name?'input-ok':''}" onchange="onSiteChange(this.value)">
-          <option value="">Select site</option>
-          ${mySites.map(s=>`<option value="${s.site_name}"${s.site_name===formData.site_name?' selected':''}>${s.site_name}</option>`).join('')}
-        </select>
+        ${isRejEdit
+          ?`<input type="text" value="${escHtml(formData.site_name||'')}" readonly class="readonly" style="background:#f1f5f9">`
+          :`<select id="s1Site" class="${formData.site_name?'input-ok':''}" onchange="onSiteChange(this.value)">
+              <option value="">Select site</option>
+              ${mySites.map(s=>`<option value="${s.site_name}"${s.site_name===formData.site_name?' selected':''}>${s.site_name}</option>`).join('')}
+            </select>`}
       </div>
       <div style="margin-bottom:8px">
         <label>Report date</label>
-        <input type="date" id="s1Date" value="${formData.report_date}" class="input-ok" onchange="onDateChange(this.value)">
+        ${isRejEdit
+          ?`<input type="text" value="${formData.report_date||''}" readonly class="readonly" style="background:#f1f5f9">`
+          :`<input type="date" id="s1Date" value="${formData.report_date}" class="input-ok" onchange="onDateChange(this.value)">`}
       </div>
       <div id="s1Duplicate"></div>
       <div class="grid-2" style="margin-top:6px">
@@ -395,10 +505,10 @@ function buildScreen1(){
     </div>
     <div class="card">
       <div class="card-title">Submitted by</div>
-      <input type="text" value="${formData.submitted_by_name}" readonly class="readonly">
+      <input type="text" value="${formData.submitted_by_name||''}" readonly class="readonly">
     </div>
   `;
-  checkDuplicate();
+  if(!isRejEdit) checkDuplicate();
 }
 function onSiteChange(v){
   formData.site_name=v;
@@ -415,7 +525,7 @@ function onSiteChange(v){
   }
   buildScreen1();
 }
-function onDateChange(v){formData.report_date=v;checkDuplicate();}
+function onDateChange(v){formData.report_date=v;buildScreen1();}
 async function checkDuplicate(){
   const el=document.getElementById('s1Duplicate');
   if(!el||!formData.site_name||!formData.report_date){if(el)el.innerHTML='';return;}
@@ -562,7 +672,8 @@ function buildScreen2(){
     const sy=p.dc>0?(gen/p.dc).toFixed(2):'—';
     const perStr=s>0?(gen/s).toFixed(1):'—';
     const isZero=gen===0;
-    const rowCls=p.isBest?' inv-row-best':p.isWorst?' inv-row-worst':'';
+    const invNote=(formData._fieldNotes||{})['inv_'+i]||'';
+    const rowCls=invNote?' inv-row-worst':(p.isBest?' inv-row-best':p.isWorst?' inv-row-worst':'');
     const scVal=formData.inv_strings_count[i];
     let cufHtml='—';
     if(p.dcCuf>0){
@@ -571,7 +682,7 @@ function buildScreen2(){
       cufHtml=p.dcCuf+'%'+badge;
     }
     rows+=`
-      <div class="inv-row${rowCls}" id="invRow${i}">
+      <div class="inv-row${rowCls}" id="invRow${i}" style="${invNote?'border:1.5px solid var(--red-border);border-radius:6px 6px 0 0;':''}">
         <div class="inv-num${isZero?' err':''}">${i+1}</div>
         <input type="number" inputmode="decimal" value="${gen||''}" placeholder="Enter kWh"
           class="${isZero?'input-err':''}" style="font-size:12px;padding:6px 8px"
@@ -592,7 +703,8 @@ function buildScreen2(){
           <div class="inv-stat-item"><span class="inv-stat-label">DC CUF%</span><span class="inv-stat-value" style="color:var(--green-dark)" id="s2mob_cuf${i}">${p.dcCuf>0?p.dcCuf+'%':'—'}</span></div>
           <div class="inv-stat-item"><span class="inv-stat-label">Loss</span><span class="inv-stat-value" id="s2mob_loss${i}">${getLossHtml(p.loss)}</span></div>
         </div>
-      </div>`;
+      </div>
+      ${invNote?`<div style="background:var(--red-light);border:1.5px solid var(--red-border);border-top:none;border-radius:0 0 6px 6px;padding:5px 10px;font-size:11px;color:var(--red);font-weight:600;margin-bottom:4px">❌ ${escHtml(invNote)}</div>`:''}`;
   }
   const total=formData.inv_gen.reduce((a,b)=>a+(+b||0),0);
   formData.total_gen_kwh=+total.toFixed(2);
@@ -1372,3 +1484,9 @@ function shareWhatsApp(){
   }
 }
 function escHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+// Parse review_note: if JSON → return object; if plain string → {general: string}
+function getFieldNotes(raw){
+  if(!raw)return{};
+  try{const p=JSON.parse(raw);if(typeof p==='object'&&p!==null)return p;}catch(e){}
+  return{general:raw};
+}

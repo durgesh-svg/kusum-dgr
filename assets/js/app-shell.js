@@ -100,3 +100,21 @@ function switchTab(tab){
   else if(tab==='overview')showOverview();
 }
 
+// ── TOAST NOTIFICATION ───────────────────────────────────────────────────────
+function showToast(msg,type='info'){
+  let el=document.getElementById('dgrToast');
+  if(!el){
+    el=document.createElement('div');
+    el.id='dgrToast';
+    el.style.cssText='position:fixed;bottom:90px;left:50%;transform:translateX(-50%) translateY(20px);padding:10px 18px;border-radius:99px;font-size:12px;font-weight:600;z-index:9999;opacity:0;transition:all .3s;pointer-events:none;white-space:nowrap;max-width:90vw;text-align:center;box-shadow:0 4px 16px rgba(0,0,0,.18)';
+    document.body.appendChild(el);
+  }
+  el.style.background=type==='success'?'#16a34a':type==='error'?'#b91c1c':'#1e293b';
+  el.style.color='#fff';
+  el.textContent=msg;
+  el.style.opacity='1';
+  el.style.transform='translateX(-50%) translateY(0)';
+  clearTimeout(el._t);
+  el._t=setTimeout(()=>{el.style.opacity='0';el.style.transform='translateX(-50%) translateY(20px)';},2800);
+}
+

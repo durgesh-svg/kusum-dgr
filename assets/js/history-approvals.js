@@ -55,7 +55,7 @@ async function loadHistory(){
           <span class="badge badge-gray">PR ${d.pr_pct||0}%</span>
           ${d.grid_outage?'<span class="badge badge-yellow">Grid outage</span>':''}
         </div>
-        ${isReturned?`<div style="background:var(--red-light);border:1px solid var(--red-border);border-left:3px solid var(--red);border-radius:0 8px 8px 0;padding:8px 11px;margin-top:8px;font-size:11px;color:var(--red);font-weight:600">Rejected by ${escHtml(d.reviewed_by||'admin')}: ${escHtml(String(d.review_note||''))}</div>`:''}
+        ${isReturned?`<div style="background:var(--red-light);border:1px solid var(--red-border);border-left:3px solid var(--red);border-radius:0 8px 8px 0;padding:8px 11px;margin-top:8px;font-size:11px;color:var(--red);font-weight:600">Rejected by ${escHtml(d.reviewed_by||'admin')}: ${escHtml(getDisplayNote(d.review_note)||String(d.review_note||''))}</div>`:''}
         <div style="margin-top:6px">
           <button class="btn btn-secondary" style="width:100%;padding:6px;font-size:10px" onclick="viewSubmission('${d.id}')">View full summary</button>
           ${isReturned?`<button class="btn btn-primary" style="width:100%;padding:7px;font-size:11px;margin-top:6px" onclick="editSubmission('${d.id}')">Edit & Resubmit</button>`:''}
@@ -104,7 +104,7 @@ async function renderApprovals(el,inAdmin){
               <span class="approval-stat">PR ${d.pr_pct||0}%</span>
               ${flags.join('')}
             </div>
-            ${isReturned?`<div style="background:var(--red-light);border:1px solid var(--red-border);border-left:3px solid var(--red);border-radius:0 8px 8px 0;padding:8px 11px;margin:6px 0;font-size:11px;color:var(--red);font-weight:600">Rejected by ${escHtml(d.reviewed_by||'admin')}: ${escHtml(String(d.review_note||''))}</div>`:''}
+            ${isReturned?`<div style="background:var(--red-light);border:1px solid var(--red-border);border-left:3px solid var(--red);border-radius:0 8px 8px 0;padding:8px 11px;margin:6px 0;font-size:11px;color:var(--red);font-weight:600">Rejected by ${escHtml(d.reviewed_by||'admin')}: ${escHtml(getDisplayNote(d.review_note)||String(d.review_note||''))}</div>`:''}
             <div class="approval-actions">
               <button class="btn btn-secondary" style="flex:1;padding:8px;font-size:11px" onclick="viewSubmission('${d.id}')">View</button>
               ${d.status==='pending'?`

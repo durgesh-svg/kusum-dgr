@@ -157,7 +157,7 @@ function _dgrCard(d,status){
       <span class="badge badge-gray">PR ${d.pr_pct||0}%</span>
       ${d.grid_outage?'<span class="badge badge-yellow">Grid outage</span>':''}
     </div>
-    ${isRejected&&d.review_note?`<div style="background:var(--red-light);border:1px solid var(--red-border);border-left:3px solid var(--red);border-radius:0 8px 8px 0;padding:7px 10px;font-size:11px;color:var(--red);font-weight:600">Rejected by ${escHtml(d.reviewed_by||'admin')}: ${escHtml(String(d.review_note||''))}</div>`:''}
+    ${isRejected&&d.review_note?`<div style="background:var(--red-light);border:1px solid var(--red-border);border-left:3px solid var(--red);border-radius:0 8px 8px 0;padding:7px 10px;font-size:11px;color:var(--red);font-weight:600">Rejected by ${escHtml(d.reviewed_by||'admin')}: ${escHtml(getDisplayNote(d.review_note)||String(d.review_note||''))}</div>`:''}
     <div style="margin-top:6px;display:flex;gap:6px">
       <button class="btn btn-secondary" style="flex:1;padding:6px;font-size:10px" onclick="viewSubmission('${d.id}')">View</button>
       ${status==='pending'?`
@@ -1002,6 +1002,29 @@ async function handleDgrHistCSV(e){
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
+// ── FIELD-LEVEL REJECTION HELPERS ────────────────────────────────────────────
+let _viewFieldNotes={};
+// Parse stored review_note (may be JSON or plain text) → readable string for display
+function getDisplayNote(raw){
+  if(!raw)return'';
+  try{const p=JSON.parse(raw);return p.general||(Object.keys(p).filter(k=>k!=='general').length>0?`${Object.keys(p).filter(k=>k!=='general').length} field(s) flagged`:'');}
+  catch(e){return raw;}
+}
+// Toggle per-inverter note row in view modal
+function toggleInvFlag(i){
+  const r=document.getElementById('vInvNoteRow'+i);
+  if(!r)return;
+  const open=r.style.display!=='none';
+  r.style.display=open?'none':'table-row';
+  if(!open){const inp=document.getElementById('vInvNoteInp'+i);if(inp)inp.focus();}
+}
+function onInvNoteChange(i,v){
+  _viewFieldNotes['inv_'+i]=v.trim();
+  const f=document.getElementById('vInvFlag'+i);
+  if(f){f.textContent=v.trim()?'📌 noted':'+ note';f.style.color=v.trim()?'var(--red)':'var(--gray)';}
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 // VIEW SUBMISSION SUMMARY
 async function viewSubmission(id){
   const modal=document.getElementById('modalOverlay');
@@ -1010,6 +1033,17 @@ async function viewSubmission(id){
   modal.classList.remove('hidden');
   const{data:d,error}=await sb.from('dgr_submissions').select('*').eq('id',id).single();
   if(error||!d){content.innerHTML=`<div class="modal-header"><div class="modal-title">Error</div><button class="modal-close" onclick="closeModal()">✕</button></div><div class="error-box">Could not load submission</div>`;return;}
+
+  // Reset field notes; pre-populate from existing JSON review_note
+  _viewFieldNotes={};
+  if(d.review_note){
+    try{
+      const _p=JSON.parse(d.review_note);
+      if(typeof _p==='object'&&_p!==null)
+        Object.keys(_p).forEach(k=>{if(k!=='general')_viewFieldNotes[k]=_p[k];});
+    }catch(e){}
+  }
+
   const dateStr=new Date(d.report_date+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
   const inv=d.inv_gen||[];
   const strs=d.inv_strings||[];
@@ -1019,13 +1053,36 @@ async function viewSubmission(id){
     const dc=d.dc_capacity_kw&&inv.length?d.dc_capacity_kw/inv.length:0;
     const sy=dc>0?(inv[i]/dc).toFixed(2):'—';
     const ps=s>0?(inv[i]/s).toFixed(1):'—';
-    invRows+=`<tr><td style="color:var(--blue);font-weight:700">INV${i+1}</td><td>${inv[i]}</td><td>${sy}</td><td>${ps}</td></tr>`;
+    const existNote=_viewFieldNotes['inv_'+i]||'';
+    invRows+=`
+      <tr id="vInvRow${i}" onclick="toggleInvFlag(${i})" style="cursor:pointer;${existNote?'background:rgba(185,28,28,.06);':''}">
+        <td style="color:var(--blue);font-weight:700">INV${i+1}</td>
+        <td>${inv[i]}</td><td>${sy}</td><td>${ps}</td>
+        <td style="text-align:right;padding:0 6px">
+          <span id="vInvFlag${i}" style="font-size:10px;color:${existNote?'var(--red)':'var(--gray)'};white-space:nowrap">${existNote?'📌 noted':'+ note'}</span>
+        </td>
+      </tr>
+      <tr id="vInvNoteRow${i}" style="display:${existNote?'table-row':'none'}">
+        <td colspan="5" style="padding:2px 4px 6px">
+          <input type="text" id="vInvNoteInp${i}" value="${escHtml(existNote)}"
+            placeholder="Note for INV${i+1} — e.g. value seems incorrect"
+            style="width:100%;padding:5px 8px;border:1.5px solid var(--red-border);background:var(--red-light);border-radius:6px;font-size:11px;font-family:inherit;color:var(--red);box-sizing:border-box"
+            oninput="onInvNoteChange(${i},this.value)">
+        </td>
+      </tr>`;
   }
   const gridDetails=(d.grid_outage_details||[]).map(o=>`${o.from||'?'}–${o.to||'?'} · ${o.reason||''}`).join('<br>');
   const plantDetails=(d.plant_outage_details||[]).map(o=>`${o.from||'?'}–${o.to||'?'} · ${o.fault_code||''} ${o.sub_fault?'('+o.sub_fault+')':''}`).join('<br>');
   const isReturned=d.status==='pending'&&!!(d.review_note&&String(d.review_note).trim());
   const statusLabel=isReturned?'returned':d.status;
   const statusCls=d.status==='approved'?'badge-green':d.status==='rejected'?'badge-red':'badge-yellow';
+
+  // Pre-extract general note for textarea (avoids IIFE inside nested template literal)
+  let _generalNote='';
+  if(d.review_note){
+    try{const _p=JSON.parse(d.review_note);_generalNote=_p.general||'';}
+    catch(e){_generalNote=String(d.review_note);}
+  }
 
   function row(label,val){return `<div class="summary-row"><span class="summary-label">${label}</span><span class="summary-value">${val}</span></div>`;}
 
@@ -1039,7 +1096,7 @@ async function viewSubmission(id){
     </div>
     <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin:8px 0 4px">Generation</div>
     <table class="admin-table" style="margin-bottom:8px">
-      <thead><tr><th>#</th><th>kWh</th><th>kWh/kWp</th><th>kWh/str</th></tr></thead>
+      <thead><tr><th>#</th><th>kWh</th><th>kWh/kWp</th><th>kWh/str</th><th style="text-align:right;font-size:9px;font-weight:400;color:var(--gray)">tap to flag ↓</th></tr></thead>
       <tbody>${invRows}</tbody>
     </table>
     ${row('Total generation','<strong>'+( d.total_gen_kwh||0)+' kWh</strong>')}
@@ -1067,9 +1124,59 @@ async function viewSubmission(id){
     <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin:10px 0 4px">Activity & Remarks</div>
     ${row('Today\'s activity',d.daily_activity||'—')}
     ${row('Remarks',d.remarks||'—')}
-    ${((d.status==='rejected'||isReturned)&&d.review_note)?row(isReturned?'Return note':'Rejection reason',`<span style="color:var(--red)">${d.review_note}</span>`):''}
-    ${d.reviewed_by?row('Reviewed by',d.reviewed_by):''}
+    ${((d.status==='rejected'||isReturned)&&d.review_note)?row('Rejection reason',`<span style="color:var(--red);font-weight:600">${escHtml(getDisplayNote(d.review_note)||String(d.review_note))}</span>`):''}
+    ${d.reviewed_by?row('Reviewed by',`<strong>${escHtml(d.reviewed_by)}</strong>`):''}
+
+    ${d.status!=='approved'?`
+    <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
+      <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Admin Action</div>
+      <textarea id="viewRejectNote" placeholder="General note (or flag specific inverter rows above)"
+        style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px;resize:vertical;min-height:60px;font-family:inherit;box-sizing:border-box"
+      >${escHtml(_generalNote)}</textarea>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button onclick="viewApprove('${d.id}')" style="flex:1;padding:9px;border-radius:8px;background:#16a34a;color:#fff;border:none;font-weight:700;font-size:13px;cursor:pointer">✓ Approve</button>
+        <button onclick="viewReject('${d.id}')" style="flex:1;padding:9px;border-radius:8px;background:var(--red-light);color:var(--red);border:1.5px solid var(--red-border);font-weight:700;font-size:13px;cursor:pointer">✕ Reject</button>
+      </div>
+    </div>`:''}
   `;
+}
+
+async function viewApprove(id){
+  const btn=event.target;btn.disabled=true;btn.textContent='Approving...';
+  try{
+    await sb.from('dgr_submissions').update({status:'approved',reviewed_by:session.name,reviewed_at:new Date().toISOString(),review_note:null}).eq('id',id);
+    showToast('Approved ✓','success');
+    closeModal();
+    if(typeof loadAdminApprovals==='function')loadAdminApprovals();
+  }catch(e){btn.disabled=false;btn.textContent='✓ Approve';showToast('Failed: '+e.message,'error');}
+}
+
+async function viewReject(id){
+  // Collect per-inverter notes from flagged rows
+  const fieldNotes={};
+  for(let i=0;i<30;i++){
+    const inp=document.getElementById('vInvNoteInp'+i);
+    if(!inp)break;
+    const v=inp.value.trim();
+    if(v)fieldNotes['inv_'+i]=v;
+  }
+  // General note from textarea
+  const generalNote=(document.getElementById('viewRejectNote')?.value||'').trim();
+  if(generalNote)fieldNotes.general=generalNote;
+  if(!Object.keys(fieldNotes).length){
+    const ta=document.getElementById('viewRejectNote');
+    if(ta){ta.style.border='1.5px solid var(--red)';ta.focus();}
+    showToast('Enter a reason or flag specific inverter rows above','error');
+    return;
+  }
+  const noteToSave=JSON.stringify(fieldNotes);
+  const btn=event.target;btn.disabled=true;btn.textContent='Rejecting...';
+  try{
+    await sb.from('dgr_submissions').update({status:'rejected',reviewed_by:session.name,reviewed_at:new Date().toISOString(),review_note:noteToSave}).eq('id',id);
+    showToast('Rejected — reason sent to engineer','error');
+    closeModal();
+    if(typeof loadAdminApprovals==='function')loadAdminApprovals();
+  }catch(e){btn.disabled=false;btn.textContent='✕ Reject';showToast('Failed: '+e.message,'error');}
 }
 
 // MODAL
