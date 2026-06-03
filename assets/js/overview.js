@@ -479,86 +479,112 @@ function toggleSiteChart() {
   if (hidden && !ovCharts.siteComp) buildSiteCompChart(ovSitePerf);
 }
 
-// ── Inverter Health Drill-down ────────────────────────────────
+// ── Inverter Health Drill-down (per-date collapsible) ─────────
 async function showInvHealth(siteName) {
   const el = document.getElementById('ovInvDetail');
   if (!el) return;
   el.classList.remove('hidden');
-  el.innerHTML = `<div class="card" style="margin-top:10px;border-left:4px solid var(--blue)"><div style="padding:16px;text-align:center;color:var(--gray);font-size:12px">Loading inverter health for ${siteName}...</div></div>`;
+  el.innerHTML = `<div class="card" style="margin-top:10px;padding:16px;text-align:center;color:var(--gray)">Loading inverter data…</div>`;
   el.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-  // Fetch last 7 days for this site
-  const to = fmtLocalDate(new Date());
-  const from7 = new Date(); from7.setDate(from7.getDate() - 6);
-  const from = fmtLocalDate(from7);
-  const { data: rows } = await sb.from('dgr_submissions').select('report_date,inv_gen,inv_strings_count').eq('site_name', siteName).gte('report_date', from).lte('report_date', to).eq('status', 'approved').order('report_date', { ascending: true });
+  // Use current filter date range from the UI
+  const filterFrom = document.getElementById('ovFrom')?.value || '';
+  const filterTo   = document.getElementById('ovTo')?.value   || '';
 
-  if (!rows || rows.length === 0) {
-    el.innerHTML = `<div class="card" style="margin-top:10px"><div style="padding:16px;text-align:center;color:var(--gray);font-size:12px">No approved data found for ${siteName} in last 7 days</div></div>`;
+  const { data: rows } = await sb.from('dgr_submissions')
+    .select('report_date,inv_gen,inv_strings_count,total_gen_kwh,dc_cuf_pct,dc_capacity_kw')
+    .eq('site_name', siteName)
+    .gte('report_date', filterFrom)
+    .lte('report_date', filterTo)
+    .order('report_date', { ascending: false });
+
+  if (!rows || !rows.length) {
+    el.innerHTML = `<div class="card" style="margin-top:10px;padding:16px;text-align:center;color:var(--gray)">No data for <strong>${escHtml(siteName)}</strong> in selected range</div>`;
     return;
   }
 
-  // Aggregate loss per inverter across all days
-  const invCount = Math.max(...rows.map(r => (r.inv_gen||[]).length));
-  const invStats = Array.from({ length: invCount }, (_, i) => {
-    const losses = [];
-    rows.forEach(r => {
-      const sc = parseFloat((r.inv_strings_count||[])[i]) || 0;
-      const kwh = parseFloat((r.inv_gen||[])[i]) || 0;
-      const dc = sc > 0 ? +(sc * 15.4).toFixed(2) : 0;
-      if (dc > 0 && kwh > 0) {
-        const cuf = +(kwh / (dc * 24) * 100).toFixed(2);
-        losses.push({ cuf, kwh, dc });
-      }
-    });
-    const maxCuf = losses.length ? Math.max(...losses.map(l => l.cuf)) : 0;
-    const avgLoss = losses.length
-      ? +(losses.reduce((a, l) => a + (maxCuf > 0 ? ((maxCuf - l.cuf) * 24 * l.dc) / l.kwh : 0), 0) / losses.length).toFixed(2)
-      : null;
-    return { inv: i + 1, avgLoss, days: losses.length };
-  });
+  const siteCfg = sites.find(s => s.site_name === siteName);
+  const safeId  = siteName.replace(/[^a-zA-Z0-9]/g, '_');
 
-  const maxLoss = Math.max(...invStats.filter(s => s.avgLoss !== null).map(s => s.avgLoss), 0);
-  const invRows = invStats.map(s => {
-    const lossVal = s.avgLoss;
-    const lossColor = lossVal === null ? 'var(--gray)' : lossVal <= 4 ? 'var(--green-dark)' : lossVal <= 15 ? 'var(--orange)' : 'var(--red)';
-    const bar = lossVal !== null && maxLoss > 0 ? `<div style="background:${lossColor};height:6px;border-radius:3px;width:${Math.min(100, (lossVal/maxLoss)*100)}%;margin-top:3px"></div>` : '';
-    return `<div class="ov-inv-row">
-      <div style="font-weight:700;color:var(--blue)">Inv ${s.inv}</div>
-      <div>${s.days} days</div>
-      <div style="color:${lossColor};font-weight:700">${lossVal !== null ? lossVal + '%' : '—'}${bar}</div>
-      <div style="color:${lossColor};font-size:10px">${lossVal === null ? '—' : lossVal <= 4 ? '✅ Good' : lossVal <= 8 ? '⚠️ Attention' : lossVal <= 15 ? '🔴 Check' : '🔴 Critical'}</div>
-    </div>`;
+  const blocksHtml = rows.map((r, idx) => {
+    const inv   = r.inv_gen           || [];
+    const strs  = r.inv_strings_count || [];
+    const dcTot = +(r.dc_capacity_kw  || siteCfg?.dc_capacity_kw || 0);
+    const n     = inv.length || 1;
+
+    // Per-inverter metrics
+    const metrics = inv.map((kwh, i) => {
+      const sc  = parseFloat(strs[i]) || 0;
+      const dc  = sc > 0 ? +(sc * 15.4).toFixed(1) : +(dcTot / n).toFixed(1);
+      const cuf = dc > 0 ? +((+kwh / (dc * 24)) * 100).toFixed(2) : 0;
+      return { kwh: +kwh || 0, sc, dc, cuf };
+    });
+
+    const bestCuf   = metrics.length ? Math.max(...metrics.map(m => m.cuf).filter(c => c > 0)) : 0;
+    const totalKwh  = +(r.total_gen_kwh || inv.reduce((a, v) => a + (+v || 0), 0));
+    const dcCuf     = r.dc_cuf_pct || 0;
+    const dateLabel = new Date(r.report_date + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+
+    const blockId  = `invBlock_${safeId}_${idx}`;
+    const expanded = idx === 0; // latest date open by default, rest collapsed
+
+    const invRows = metrics.map((m, i) => {
+      const loss      = bestCuf > 0 && m.cuf > 0 ? +((bestCuf - m.cuf) / bestCuf * 100).toFixed(2) : 0;
+      const icon      = m.kwh === 0 ? '🔴' : loss > 15 ? '🔴' : loss > 4 ? '⚠️' : '✅';
+      const lossColor = loss > 15 ? 'var(--red)' : loss > 4 ? 'var(--orange)' : 'var(--green-dark)';
+      return `<div style="display:flex;align-items:center;flex-wrap:wrap;gap:5px;font-size:11px;padding:5px 0;border-bottom:1px solid var(--border)">
+        <span>${icon}</span>
+        <span style="color:var(--blue);font-weight:700;min-width:38px">Inv ${i + 1}</span>
+        <span style="font-weight:600">${m.kwh.toLocaleString('en-IN')} kWh</span>
+        <span style="color:var(--border)">|</span>
+        <span>Str: <strong>${m.sc}</strong></span>
+        <span style="color:var(--border)">|</span>
+        <span>DC: <strong>${m.dc} kW</strong></span>
+        <span style="color:var(--border)">|</span>
+        <span>CUF: <strong>${m.cuf}%</strong></span>
+        <span style="color:var(--border)">|</span>
+        <span style="color:${lossColor};font-weight:700">Loss: ${loss}%</span>
+      </div>`;
+    }).join('');
+
+    return `
+      <div style="border:1.5px solid var(--border);border-radius:10px;margin-bottom:8px;overflow:hidden">
+        <div onclick="toggleInvBlock('${blockId}')" style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;background:#f8fafc;cursor:pointer;user-select:none">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span id="${blockId}_icon" style="font-size:11px;color:var(--gray)">${expanded ? '▼' : '▶'}</span>
+            <div style="font-size:12px;font-weight:700;color:var(--text)">📅 ${dateLabel}</div>
+          </div>
+          <div style="display:flex;gap:10px;align-items:center;font-size:11px">
+            <span style="font-weight:700;color:var(--primary)">${totalKwh.toLocaleString('en-IN')} kWh</span>
+            <span style="color:var(--gray)">DC CUF: <strong style="color:var(--text)">${dcCuf}%</strong></span>
+          </div>
+        </div>
+        <div id="${blockId}" style="padding:6px 12px 10px;display:${expanded ? 'block' : 'none'}">
+          ${invRows}
+        </div>
+      </div>`;
   }).join('');
 
-  const canvasId = 'chartInvHealth_' + Date.now();
   el.innerHTML = `
     <div class="card" style="margin-top:10px;border-left:4px solid var(--blue)">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-        <div class="card-title" style="margin-bottom:0">🏭 ${siteName} — Inverter Health (Last 7 Days)</div>
-        <button onclick="document.getElementById('ovInvDetail').classList.add('hidden')" style="background:none;border:none;font-size:16px;cursor:pointer;color:var(--gray)">✕</button>
-      </div>
-      <div style="position:relative;height:200px;margin-bottom:12px"><canvas id="${canvasId}"></canvas></div>
-      <div style="overflow-x:auto">
-        <div style="min-width:380px">
-          <div class="ov-inv-row ov-table-header"><div>Inverter</div><div>Data Days</div><div>Avg Loss%</div><div>Health</div></div>
-          ${invRows}
+        <div>
+          <div class="card-title" style="margin-bottom:2px">🏭 ${escHtml(siteName)}</div>
+          <div style="font-size:10px;color:var(--gray)">${filterFrom} → ${filterTo} · ${rows.length} day${rows.length !== 1 ? 's' : ''}</div>
         </div>
+        <button onclick="document.getElementById('ovInvDetail').classList.add('hidden')" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--gray);padding:4px">✕</button>
       </div>
+      ${blocksHtml}
     </div>`;
+}
 
-  setTimeout(() => {
-    const c = document.getElementById(canvasId);
-    if (!c || typeof Chart === 'undefined') return;
-    ovCharts.invHealth = new Chart(c, {
-      type: 'bar',
-      data: {
-        labels: invStats.map(s => 'Inv ' + s.inv),
-        datasets: [{ label: 'Avg Loss%', data: invStats.map(s => s.avgLoss ?? 0), backgroundColor: invStats.map(s => !s.avgLoss ? 'rgba(107,114,128,.4)' : s.avgLoss <= 4 ? 'rgba(22,163,74,.7)' : s.avgLoss <= 15 ? 'rgba(249,115,22,.7)' : 'rgba(185,28,28,.7)'), borderRadius: 4 }]
-      },
-      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { font: { size: 9 } } }, y: { ticks: { font: { size: 10 } }, title: { display: true, text: 'Loss%', font: { size: 9 } } } } }
-    });
-  }, 100);
+function toggleInvBlock(id) {
+  const el   = document.getElementById(id);
+  const icon = document.getElementById(id + '_icon');
+  if (!el) return;
+  const isHidden = el.style.display === 'none';
+  el.style.display = isHidden ? 'block' : 'none';
+  if (icon) icon.textContent = isHidden ? '▼' : '▶';
 }
 
 // ── Tab Switch ────────────────────────────────────────────────
