@@ -227,7 +227,11 @@ async function renderOverview(filterSite = '', filterFrom = '', filterTo = '') {
           </div>
         </div>
 
-        <!-- Site Performance Table -->
+        ${filterSite ? `
+        <!-- Single site selected: inverter detail shown directly -->
+        <div id="ovInvDetail"></div>
+        ` : `
+        <!-- All sites: summary table + click-to-detail -->
         <div class="card">
           <div class="card-title" style="margin-bottom:8px">Site-wise Performance — ${Object.keys(ovSitePerf).length} sites <span style="font-size:9px;color:var(--gray)">(click site to see inverter health)</span></div>
           <div style="overflow-x:auto">
@@ -240,22 +244,24 @@ async function renderOverview(filterSite = '', filterFrom = '', filterTo = '') {
           </div>
           <div id="ovPerfPagination"></div>
         </div>
-
         <!-- Inverter Health Detail -->
         <div id="ovInvDetail" class="hidden"></div>
+        `}
       </div>
     </div>`;
 
   // Render paginated tables
   renderCompliancePage(1);
   renderEngineerPage(1);
-  renderPerfPage(1);
+  if (!filterSite) renderPerfPage(1);
 
   // Build charts after DOM ready
   setTimeout(() => {
     buildDailyCompChart(ovAllRows);
     buildDailyGenChart(ovAllRows);
     buildSiteCompChart(ovSitePerf);
+    // Single site: auto-show inverter detail directly
+    if (filterSite) showInvHealth(filterSite);
   }, 100);
 }
 
@@ -328,7 +334,7 @@ function processPerfData(rows) {
     const avgPr = avg(p.prs);
     const prColor = avgPr !== '—' && avgPr < 75 ? 'var(--red)' : 'var(--green-dark)';
     return { site, html: `
-      <div class="ov-perf-row" onclick="showInvHealth('${site.replace(/'/g,"\\'")}'" style="cursor:pointer">
+      <div class="ov-perf-row" onclick="showInvHealth('${site.replace(/'/g,"\\'")}');" style="cursor:pointer">
         <div style="font-weight:600;color:var(--blue)">${site}</div>
         <div>${p.count}</div>
         <div>${avg(p.gens) !== '—' ? Number(avg(p.gens)).toLocaleString('en-IN') : '—'} kWh</div>
@@ -480,12 +486,18 @@ function toggleSiteChart() {
 }
 
 // ── Inverter Health Drill-down (per-date collapsible) ─────────
+let _invDetailData = null; // stored for Excel export
+
 async function showInvHealth(siteName) {
   const el = document.getElementById('ovInvDetail');
   if (!el) return;
+
+  // Detect if called inline (single site pre-selected) vs click-to-view
+  const isSingleSite = !!(document.getElementById('ovSite')?.value);
+
   el.classList.remove('hidden');
-  el.innerHTML = `<div class="card" style="margin-top:10px;padding:16px;text-align:center;color:var(--gray)">Loading inverter data…</div>`;
-  el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  el.innerHTML = `<div class="card" style="padding:16px;text-align:center;color:var(--gray)">Loading inverter data…</div>`;
+  if (!isSingleSite) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   // Use current filter date range from the UI
   const filterFrom = document.getElementById('ovFrom')?.value || '';
@@ -499,9 +511,12 @@ async function showInvHealth(siteName) {
     .order('report_date', { ascending: false });
 
   if (!rows || !rows.length) {
-    el.innerHTML = `<div class="card" style="margin-top:10px;padding:16px;text-align:center;color:var(--gray)">No data for <strong>${escHtml(siteName)}</strong> in selected range</div>`;
+    el.innerHTML = `<div class="card" style="padding:16px;text-align:center;color:var(--gray)">No data for <strong>${escHtml(siteName)}</strong> in selected range</div>`;
     return;
   }
+
+  // Store for Excel export
+  _invDetailData = { siteName, filterFrom, filterTo, rows };
 
   const siteCfg = sites.find(s => s.site_name === siteName);
   const safeId  = siteName.replace(/[^a-zA-Z0-9]/g, '_');
@@ -566,13 +581,16 @@ async function showInvHealth(siteName) {
   }).join('');
 
   el.innerHTML = `
-    <div class="card" style="margin-top:10px;border-left:4px solid var(--blue)">
+    <div class="card" style="border-left:4px solid var(--blue)">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
         <div>
           <div class="card-title" style="margin-bottom:2px">🏭 ${escHtml(siteName)}</div>
           <div style="font-size:10px;color:var(--gray)">${filterFrom} → ${filterTo} · ${rows.length} day${rows.length !== 1 ? 's' : ''}</div>
         </div>
-        <button onclick="document.getElementById('ovInvDetail').classList.add('hidden')" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--gray);padding:4px">✕</button>
+        <div style="display:flex;gap:6px;align-items:center">
+          <button onclick="downloadInvExcel()" style="padding:6px 12px;font-size:11px;font-weight:600;background:#f0fdf4;color:#16a34a;border:1.5px solid #bbf7d0;border-radius:7px;cursor:pointer;font-family:inherit">⬇ Excel</button>
+          ${!isSingleSite ? `<button onclick="document.getElementById('ovInvDetail').classList.add('hidden')" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--gray);padding:4px">✕</button>` : ''}
+        </div>
       </div>
       ${blocksHtml}
     </div>`;
@@ -585,6 +603,51 @@ function toggleInvBlock(id) {
   const isHidden = el.style.display === 'none';
   el.style.display = isHidden ? 'block' : 'none';
   if (icon) icon.textContent = isHidden ? '▼' : '▶';
+}
+
+function downloadInvExcel() {
+  if (!_invDetailData || typeof XLSX === 'undefined') { showToast('Excel library not ready','error'); return; }
+  const { siteName, filterFrom, filterTo, rows } = _invDetailData;
+  const siteCfg = sites.find(s => s.site_name === siteName);
+
+  // Header row
+  const wsData = [['Date', 'Inverter', 'kWh', 'Strings', 'DC kW', 'CUF%', 'Loss%', 'Status']];
+
+  rows.forEach(r => {
+    const inv   = r.inv_gen           || [];
+    const strs  = r.inv_strings_count || [];
+    const dcTot = +(r.dc_capacity_kw  || siteCfg?.dc_capacity_kw || 0);
+    const n     = inv.length || 1;
+    const dateLabel = new Date(r.report_date + 'T00:00:00')
+      .toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+
+    const metrics = inv.map((kwh, i) => {
+      const sc  = parseFloat(strs[i]) || 0;
+      const dc  = sc > 0 ? +(sc * 15.4).toFixed(1) : +(dcTot / n).toFixed(1);
+      const cuf = dc > 0 ? +((+kwh / (dc * 24)) * 100).toFixed(2) : 0;
+      return { kwh: +kwh || 0, sc, dc, cuf };
+    });
+    const bestCuf = metrics.length ? Math.max(...metrics.map(m => m.cuf).filter(c => c > 0)) : 0;
+
+    metrics.forEach((m, i) => {
+      const loss   = bestCuf > 0 && m.cuf > 0 ? +((bestCuf - m.cuf) / bestCuf * 100).toFixed(2) : 0;
+      const status = m.kwh === 0 ? 'Zero' : loss > 15 ? 'Critical' : loss > 4 ? 'Attention' : 'Normal';
+      wsData.push([dateLabel, `Inv ${i + 1}`, m.kwh, m.sc, m.dc, m.cuf, loss, status]);
+    });
+
+    // Daily total row
+    const totalKwh = +(r.total_gen_kwh || inv.reduce((a, v) => a + (+v || 0), 0));
+    wsData.push([dateLabel, 'TOTAL', totalKwh, '', '', r.dc_cuf_pct || 0, '', '']);
+    wsData.push([]); // blank separator
+  });
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  // Column widths
+  ws['!cols'] = [{ wch: 16 }, { wch: 8 }, { wch: 10 }, { wch: 8 }, { wch: 10 }, { wch: 8 }, { wch: 8 }, { wch: 10 }];
+  XLSX.utils.book_append_sheet(wb, ws, siteName.slice(0, 31));
+  XLSX.writeFile(wb, `${siteName}_inverter_${filterFrom}_to_${filterTo}.xlsx`);
+  showToast('Excel downloaded ✓', 'success');
 }
 
 // ── Tab Switch ────────────────────────────────────────────────
