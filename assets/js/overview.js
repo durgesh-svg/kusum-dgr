@@ -88,13 +88,14 @@ async function renderOverview(filterSite = '', filterFrom = '', filterTo = '') {
   const avgDcCuf = avg(ovAllRows.filter(r => r.dc_cuf_pct > 0).map(r => +r.dc_cuf_pct));
   const avgPr = avg(ovAllRows.filter(r => r.pr_pct > 0).map(r => +r.pr_pct));
 
-  // Missing DGR today — separate query (no date range / site filter)
-  const today = todayLocal();
-  const { data: todayRows } = await sb.from('dgr_submissions')
+  // Missing DGR — for the selected end date (filterTo)
+  const pendingDate = filterTo || todayLocal();
+  const pendingDateLabel = new Date(pendingDate + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+  const { data: pendingRows } = await sb.from('dgr_submissions')
     .select('site_name')
-    .eq('report_date', today);
-  const submittedToday = new Set((todayRows || []).map(r => r.site_name));
-  const missingSites = siteList.filter(s => !submittedToday.has(s));
+    .eq('report_date', pendingDate);
+  const submittedOnDate = new Set((pendingRows || []).map(r => r.site_name));
+  const missingSites = siteList.filter(s => !submittedOnDate.has(s));
 
   // Fetch engineers and their assigned sites to show who hasn't submitted
   const { data: engineers } = await sb.from('users')
@@ -147,38 +148,9 @@ async function renderOverview(filterSite = '', filterFrom = '', filterTo = '') {
         <button onclick="applyOvFilters()" style="padding:5px 10px;font-size:12px;border:1.5px solid var(--border);border-radius:7px;background:#fff;cursor:pointer">🔄</button>
       </div>
 
-      <!-- Missing DGR Alert -->
-      ${missingSites.length > 0 ? `
-      <div style="margin-bottom:8px;border-radius:10px;overflow:hidden;border:1.5px solid var(--red-border)">
-        <div style="background:var(--red);padding:6px 12px;display:flex;align-items:center;justify-content:space-between">
-          <div style="color:#fff;font-size:12px;font-weight:700">🚨 ${missingSites.length} Sites Pending · ${Object.keys(missingByEng).length} Engineers</div>
-          <div style="color:rgba(255,255,255,.8);font-size:10px">${today}</div>
-        </div>
-        <div style="background:var(--red-light);max-height:120px;overflow-y:auto;-webkit-overflow-scrolling:touch">
-          ${Object.entries(missingByEng).map(([eng, engSites]) => `
-            <div style="display:flex;align-items:center;gap:8px;padding:4px 10px;border-bottom:1px solid var(--red-border)">
-              <div style="width:18px;height:18px;border-radius:50%;background:var(--red);color:#fff;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;flex-shrink:0">${eng.charAt(0).toUpperCase()}</div>
-              <div style="font-size:11px;font-weight:700;color:var(--text);min-width:100px;flex-shrink:0">${eng}</div>
-              <div style="display:flex;flex-wrap:wrap;gap:3px;flex:1">
-                ${engSites.map(s => `<span style="background:#fff;color:var(--red);font-size:9px;font-weight:600;padding:1px 6px;border-radius:20px;border:1px solid var(--red-border)">${s}</span>`).join('')}
-              </div>
-            </div>`).join('')}
-        </div>
-      </div>` : `
-      <div style="margin-bottom:8px;border-radius:10px;overflow:hidden;border:1.5px solid var(--green-border)">
-        <div style="background:var(--green);padding:6px 12px;display:flex;align-items:center;gap:6px">
-          <span>✅</span><div style="color:#fff;font-size:12px;font-weight:700">All Sites Submitted DGR Today</div>
-        </div>
-      </div>`}
-
-      <!-- KPI Grid — 3 cols with sub-text -->
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px">
-        ${kpiCard2('⚡','Generation',(totalGen/1000).toFixed(1)+' MWh','var(--primary)',totalGen.toLocaleString('en-IN')+' kWh')}
-        ${kpiCard2('⏱','On-Time',compliancePct+'%',compliancePct>=80?'var(--green-dark)':compliancePct>=60?'var(--orange)':'var(--red)',onTime+' / '+total+' reports')}
-        ${kpiCard2('📊','Avg PR%',avgPr+'%',avgPr!=='—'&&avgPr<75?'var(--red)':'var(--green-dark)',avgPr>=75?'Good':'Below target')}
-        ${kpiCard2('☀️','DC CUF%',avgDcCuf+'%','var(--primary)','Capacity utilization')}
-        ${kpiCard2('✅','On Time',onTime,'var(--green-dark)',compliancePct+'% compliance')}
-        ${kpiCard2('🕐','Late',late,late>0?'var(--red)':'var(--green-dark)',late>0?'Need attention':'All good')}
+      <!-- Pending DGR Section — has its own date picker -->
+      <div id="pendingSection" style="margin-bottom:8px">
+        ${_buildPendingHtml(missingSites, missingByEng, pendingDate, pendingDateLabel)}
       </div>
 
       <!-- Sub Tabs -->
@@ -189,12 +161,6 @@ async function renderOverview(filterSite = '', filterFrom = '', filterTo = '') {
 
       <!-- Compliance Panel -->
       <div class="ov-tab-panel ${ovActiveTab !== 'compliance' ? 'hidden' : ''}" data-panel="compliance">
-
-        <!-- Daily Submission Chart -->
-        <div class="card" style="margin-bottom:10px">
-          <div class="card-title" style="margin-bottom:8px">Daily Submission — On Time vs Late</div>
-          <div style="position:relative;height:180px"><canvas id="chartDailyComp"></canvas></div>
-        </div>
 
         <!-- Engineer Summary -->
         <div class="card" style="margin-bottom:10px">
@@ -275,7 +241,6 @@ async function renderOverview(filterSite = '', filterFrom = '', filterTo = '') {
 
   // Build charts after DOM ready
   setTimeout(() => {
-    buildDailyCompChart(ovAllRows);
     buildDailyGenChart(ovAllRows, filterSite);
     buildSiteCompChart(ovSitePerf);
     // Single site: auto-show inverter detail directly
@@ -717,6 +682,62 @@ function _buildAllSiteBlocks(sitePerf) {
     }).join('');
 }
 
+// ── Pending Section helpers ───────────────────────────────────
+function _buildPendingHtml(missingSites, missingByEng, pendingDate, pendingDateLabel) {
+  const listHtml = missingSites.length > 0
+    ? `<div style="background:var(--red-light);max-height:150px;overflow-y:auto;-webkit-overflow-scrolling:touch">
+        ${Object.entries(missingByEng).map(([eng, engSites]) => `
+          <div style="display:flex;align-items:center;gap:8px;padding:5px 10px;border-bottom:1px solid var(--red-border)">
+            <div style="width:20px;height:20px;border-radius:50%;background:var(--red);color:#fff;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0">${eng.charAt(0).toUpperCase()}</div>
+            <div style="font-size:11px;font-weight:700;color:var(--text);min-width:100px;flex-shrink:0">${escHtml(eng)}</div>
+            <div style="display:flex;flex-wrap:wrap;gap:3px;flex:1">
+              ${engSites.map(s => `<span style="background:#fff;color:var(--red);font-size:9px;font-weight:600;padding:2px 7px;border-radius:20px;border:1px solid var(--red-border)">${escHtml(s)}</span>`).join('')}
+            </div>
+          </div>`).join('')}
+      </div>`
+    : `<div style="background:var(--green-light,#f0fdf4);padding:8px 12px;font-size:11px;color:var(--green-dark);font-weight:600">✅ All sites submitted for ${pendingDateLabel}</div>`;
+
+  const headerBg   = missingSites.length > 0 ? 'var(--red)' : 'var(--green,#16a34a)';
+  const headerBdr  = missingSites.length > 0 ? 'var(--red-border)' : 'var(--green-border,#bbf7d0)';
+  const headerText = missingSites.length > 0
+    ? `🚨 ${missingSites.length} Sites Pending · ${Object.keys(missingByEng).length} Engineers`
+    : `✅ All Sites Submitted`;
+
+  return `
+    <div style="border-radius:10px;overflow:hidden;border:1.5px solid ${headerBdr}">
+      <div style="background:${headerBg};padding:7px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <div style="color:#fff;font-size:12px;font-weight:700;flex:1">${headerText}</div>
+        <input type="date" value="${pendingDate}"
+          onchange="refreshPendingSection(this.value)"
+          style="padding:3px 6px;font-size:11px;border:none;border-radius:6px;background:rgba(255,255,255,.2);color:#fff;font-family:inherit;cursor:pointer;outline:none"
+          title="Change date to see pending for that day">
+      </div>
+      ${listHtml}
+    </div>`;
+}
+
+async function refreshPendingSection(date) {
+  const wrap = document.getElementById('pendingSection');
+  if (!wrap) return;
+  wrap.innerHTML = `<div style="border-radius:10px;background:var(--border);padding:10px 12px;font-size:11px;color:var(--gray)">Loading…</div>`;
+
+  // Fetch submissions for the chosen date
+  const { data: rows } = await sb.from('dgr_submissions').select('site_name').eq('report_date', date);
+  const submitted = new Set((rows || []).map(r => r.site_name));
+  const siteList  = sites.map(s => s.site_name);
+  const missing   = siteList.filter(s => !submitted.has(s));
+
+  // Fetch engineers (use cached if available)
+  const { data: engineers } = await sb.from('users').select('name,phone,assigned_sites').eq('role','engineer');
+  const engMap = {};
+  (engineers || []).forEach(e => (e.assigned_sites || []).forEach(s => { engMap[s] = e.name || e.phone; }));
+  const byEng = {};
+  missing.forEach(s => { const e = engMap[s] || 'Unassigned'; if (!byEng[e]) byEng[e] = []; byEng[e].push(s); });
+
+  const label = new Date(date + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+  wrap.innerHTML = _buildPendingHtml(missing, byEng, date, label);
+}
+
 function filterSiteBlocks(query) {
   const q = (query || '').toLowerCase().trim();
   const blocks = document.querySelectorAll('#ovSiteBlocks > div');
@@ -811,7 +832,6 @@ function switchOvTab(tab) {
   document.querySelectorAll('.ov-tab-panel').forEach(p => p.classList.toggle('hidden', p.dataset.panel !== tab));
   // Rebuild charts on tab switch if needed
   setTimeout(() => {
-    if (tab === 'compliance' && !ovCharts.dailyComp) buildDailyCompChart(ovAllRows);
     if (tab === 'performance') {
       const _fs = document.getElementById('ovSite')?.value || '';
       if (_fs && !ovCharts.dailyGen) buildDailyGenChart(ovAllRows, _fs);
