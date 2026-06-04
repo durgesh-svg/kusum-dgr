@@ -62,7 +62,10 @@ async function renderOverview(filterSite = '', filterFrom = '', filterTo = '') {
   ovCharts = {};
 
   // Fetch submissions in range (for charts/tables)
-  let query = sb.from('dgr_submissions').select('*').gte('report_date', filterFrom).lte('report_date', filterTo).order('report_date', { ascending: false });
+  // Only fetch columns needed for overview — avoids pulling large inv_gen/image_urls JSON
+  let query = sb.from('dgr_submissions')
+    .select('id,site_name,report_date,created_at,submitted_by_name,status,total_gen_kwh,dc_cuf_pct,ac_cuf_pct,pr_pct,dc_capacity_kw,grid_outage,plant_outage,plant_outage_details,wti_c,oti_c')
+    .gte('report_date', filterFrom).lte('report_date', filterTo).order('report_date', { ascending: false });
   if (filterSite) query = query.eq('site_name', filterSite);
   const { data: rows, error } = await query;
   if (error) { el.innerHTML = `<div class="card" style="color:var(--red)">Error: ${error.message}</div>`; return; }
