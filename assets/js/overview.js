@@ -8,6 +8,7 @@ const CUTOFF_HOUR = 21; // 9 PM cutoff
 const OV_PAGE_SIZE = 25;
 let ovActiveTab = 'compliance';
 let ovAutoRefreshTimer = null;
+let _ovSite = ''; // tracks selected site for searchable dropdown
 let ovComplianceRows = [];
 let ovEngineerRows = [];
 let ovPerfRows = [];
@@ -111,8 +112,13 @@ async function renderOverview(filterSite = '', filterFrom = '', filterTo = '') {
     missingByEng[eng].push(site);
   });
 
-  // Build site filter opts
-  const siteOpts = `<option value="">All Sites</option>` + siteList.map(s => `<option value="${s}" ${s === filterSite ? 'selected' : ''}>${s}</option>`).join('');
+  // Sync selected site global
+  _ovSite = filterSite;
+
+  // Build searchable dropdown items
+  const siteItems = siteList.map(s =>
+    `<div onclick="selectOvSite('${s.replace(/'/g,"\\'")}');" style="padding:7px 10px;font-size:11px;cursor:pointer;border-bottom:1px solid var(--border)${s===filterSite?';background:var(--primary-light,#fef9ec);font-weight:700':''}" onmouseover="this.style.background='var(--bg,#f8fafc)'" onmouseout="this.style.background='${s===filterSite?'var(--primary-light,#fef9ec)':''}'">${escHtml(s)}</div>`
+  ).join('');
 
   el.innerHTML = `
     <div style="padding-bottom:80px">
@@ -123,7 +129,16 @@ async function renderOverview(filterSite = '', filterFrom = '', filterTo = '') {
           <div style="font-size:14px;font-weight:800;color:var(--text)">📊 Overview</div>
           <div style="font-size:9px;color:var(--text-muted)">${filterFrom} → ${filterTo}</div>
         </div>
-        <select id="ovSite" onchange="applyOvFilters()" style="flex:2;min-width:100px;padding:5px 8px;font-size:11px;border:1.5px solid var(--border);border-radius:7px">${siteOpts}</select>
+        <div style="flex:2;min-width:110px;position:relative">
+          <input id="ovSiteInput" type="text" value="${escHtml(filterSite)}" placeholder="All Sites" autocomplete="off"
+            onclick="showSiteDd()" oninput="filterSiteDd(this.value)" onblur="setTimeout(hideSiteDd,200)"
+            style="width:100%;padding:5px 22px 5px 8px;font-size:11px;border:1.5px solid var(--border);border-radius:7px;box-sizing:border-box;font-family:inherit">
+          <span style="position:absolute;right:6px;top:50%;transform:translateY(-50%);font-size:9px;color:var(--gray);pointer-events:none">▼</span>
+          <div id="ovSiteDd" style="display:none;position:absolute;top:calc(100% + 2px);left:0;right:0;min-width:180px;background:#fff;border:1.5px solid var(--border);border-radius:8px;box-shadow:0 6px 24px rgba(0,0,0,.13);z-index:300;max-height:240px;overflow-y:auto">
+            <div onclick="selectOvSite('');" style="padding:8px 10px;font-size:11px;font-weight:700;cursor:pointer;border-bottom:1.5px solid var(--border);color:var(--primary)">All Sites</div>
+            ${siteItems}
+          </div>
+        </div>
         <input type="date" id="ovFrom" value="${filterFrom}" onchange="applyOvFilters()" style="flex:1;min-width:90px;padding:5px 6px;font-size:11px;border:1.5px solid var(--border);border-radius:7px">
         <input type="date" id="ovTo" value="${filterTo}" onchange="applyOvFilters()" style="flex:1;min-width:90px;padding:5px 6px;font-size:11px;border:1.5px solid var(--border);border-radius:7px">
         <button onclick="applyOvFilters()" style="padding:5px 10px;font-size:12px;border:1.5px solid var(--border);border-radius:7px;background:#fff;cursor:pointer">🔄</button>
@@ -210,11 +225,12 @@ async function renderOverview(filterSite = '', filterFrom = '', filterTo = '') {
       <!-- Performance Panel -->
       <div class="ov-tab-panel ${ovActiveTab !== 'performance' ? 'hidden' : ''}" data-panel="performance">
 
-        <!-- Daily Generation Chart -->
+        <!-- Daily Generation Chart — only for single site -->
+        ${filterSite ? `
         <div class="card" style="margin-bottom:10px">
           <div class="card-title" style="margin-bottom:8px">Daily Generation Trend (kWh)</div>
           <div style="position:relative;height:200px"><canvas id="chartDailyGen"></canvas></div>
-        </div>
+        </div>` : ''}
 
         <!-- Site Comparison Chart — collapsible -->
         <div class="card" style="margin-bottom:10px">
@@ -231,21 +247,20 @@ async function renderOverview(filterSite = '', filterFrom = '', filterTo = '') {
         <!-- Single site selected: inverter detail shown directly -->
         <div id="ovInvDetail"></div>
         ` : `
-        <!-- All sites: summary table + click-to-detail -->
+        <!-- All sites: collapsible site blocks with search (lazy load on expand) -->
         <div class="card">
-          <div class="card-title" style="margin-bottom:8px">Site-wise Performance — ${Object.keys(ovSitePerf).length} sites <span style="font-size:9px;color:var(--gray)">(click site to see inverter health)</span></div>
-          <div style="overflow-x:auto">
-            <div style="min-width:680px">
-              <div class="ov-perf-row ov-table-header">
-                <div>Site</div><div>Days</div><div>Avg Gen</div><div>DC CUF%</div><div>AC CUF%</div><div>Avg PR%</div><div>Best Day</div><div>Worst Day</div>
-              </div>
-              <div id="ovPerfBody"></div>
-            </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:8px">
+            <div class="card-title" style="margin-bottom:0">Site-wise Performance — ${Object.keys(ovSitePerf).length} sites</div>
           </div>
-          <div id="ovPerfPagination"></div>
+          <div style="position:relative;margin-bottom:10px">
+            <input id="ovSiteSearch" type="text" placeholder="🔍  Search site..."
+              oninput="filterSiteBlocks(this.value)"
+              style="width:100%;padding:8px 12px 8px 14px;font-size:12px;border:1.5px solid var(--border);border-radius:8px;font-family:inherit;box-sizing:border-box;outline:none"
+              onfocus="this.style.borderColor='var(--primary)'" onblur="this.style.borderColor='var(--border)'">
+          </div>
+          <div id="ovSiteBlocks">${_buildAllSiteBlocks(ovSitePerf)}</div>
+          <div id="ovSiteNoResult" style="display:none;text-align:center;color:var(--gray);font-size:12px;padding:16px">No sites found</div>
         </div>
-        <!-- Inverter Health Detail -->
-        <div id="ovInvDetail" class="hidden"></div>
         `}
       </div>
     </div>`;
@@ -253,12 +268,12 @@ async function renderOverview(filterSite = '', filterFrom = '', filterTo = '') {
   // Render paginated tables
   renderCompliancePage(1);
   renderEngineerPage(1);
-  if (!filterSite) renderPerfPage(1);
+  // renderPerfPage not needed — replaced by lazy site blocks
 
   // Build charts after DOM ready
   setTimeout(() => {
     buildDailyCompChart(ovAllRows);
-    buildDailyGenChart(ovAllRows);
+    buildDailyGenChart(ovAllRows, filterSite);
     buildSiteCompChart(ovSitePerf);
     // Single site: auto-show inverter detail directly
     if (filterSite) showInvHealth(filterSite);
@@ -440,23 +455,97 @@ function buildDailyCompChart(rows) {
   });
 }
 
-function buildDailyGenChart(rows) {
+function buildDailyGenChart(rows, filterSite) {
   const canvas = document.getElementById('chartDailyGen');
   if (!canvas || typeof Chart === 'undefined') return;
-  const dateMap = {};
-  rows.forEach(r => {
-    if (!dateMap[r.report_date]) dateMap[r.report_date] = 0;
-    dateMap[r.report_date] += (+r.total_gen_kwh || 0);
-  });
-  const labels = Object.keys(dateMap).sort();
-  ovCharts.dailyGen = new Chart(canvas, {
-    type: 'bar',
-    data: {
-      labels: labels.map(d => d.slice(5)),
-      datasets: [{ label: 'Total kWh', data: labels.map(d => +(dateMap[d]/1000).toFixed(1)), backgroundColor: 'rgba(126,87,0,.65)', borderRadius: 4, borderColor: 'rgba(126,87,0,1)', borderWidth: 1 }]
-    },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { font: { size: 9 } } }, y: { ticks: { font: { size: 10 } }, title: { display: true, text: 'MWh', font: { size: 9 } } } } }
-  });
+
+  if (filterSite) {
+    // ── Single site: dual-axis — kWh bars (left) + DC CUF% line (right) ──
+    const dateMap = {};
+    rows.forEach(r => {
+      if (!dateMap[r.report_date]) dateMap[r.report_date] = { kwh: 0, cuf: 0, cufN: 0 };
+      dateMap[r.report_date].kwh += (+r.total_gen_kwh || 0);
+      if ((+r.dc_cuf_pct || 0) > 0) { dateMap[r.report_date].cuf += +r.dc_cuf_pct; dateMap[r.report_date].cufN++; }
+    });
+    const labels = Object.keys(dateMap).sort();
+    ovCharts.dailyGen = new Chart(canvas, {
+      type: 'bar',
+      data: {
+        labels: labels.map(d => d.slice(5)),
+        datasets: [
+          {
+            label: 'kWh', yAxisID: 'yKwh', order: 2,
+            data: labels.map(d => +dateMap[d].kwh.toFixed(0)),
+            backgroundColor: 'rgba(126,87,0,.65)', borderColor: 'rgba(126,87,0,1)', borderWidth: 1, borderRadius: 4
+          },
+          {
+            label: 'DC CUF%', yAxisID: 'yCuf', order: 1, type: 'line',
+            data: labels.map(d => dateMap[d].cufN > 0 ? +(dateMap[d].cuf / dateMap[d].cufN).toFixed(2) : null),
+            borderColor: 'rgba(37,99,235,1)', backgroundColor: 'rgba(37,99,235,.08)',
+            borderWidth: 2, pointRadius: 3, pointBackgroundColor: 'rgba(37,99,235,1)', tension: 0.3
+          }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: true, position: 'top', labels: { font: { size: 10 }, boxWidth: 12 } },
+          tooltip: { callbacks: { label: ctx => ctx.dataset.label === 'DC CUF%' ? ` DC CUF: ${ctx.parsed.y}%` : ` kWh: ${(+ctx.parsed.y).toLocaleString('en-IN')}` } }
+        },
+        scales: {
+          x: { ticks: { font: { size: 9 } } },
+          yKwh: { type: 'linear', position: 'left',  ticks: { font: { size: 9 } }, title: { display: true, text: 'kWh', font: { size: 9 } } },
+          yCuf: { type: 'linear', position: 'right', ticks: { font: { size: 9 }, callback: v => v + '%' }, title: { display: true, text: 'DC CUF%', font: { size: 9 } }, grid: { drawOnChartArea: false } }
+        }
+      }
+    });
+  } else {
+    // ── All sites: fleet MWh bars + fleet avg DC CUF% line ────────────────
+    const dateMapKwh = {}, dateMapCuf = {};
+    rows.forEach(r => {
+      if (!dateMapKwh[r.report_date]) dateMapKwh[r.report_date] = 0;
+      dateMapKwh[r.report_date] += (+r.total_gen_kwh || 0);
+      if ((+r.dc_cuf_pct || 0) > 0) {
+        if (!dateMapCuf[r.report_date]) dateMapCuf[r.report_date] = { sum: 0, n: 0 };
+        dateMapCuf[r.report_date].sum += +r.dc_cuf_pct;
+        dateMapCuf[r.report_date].n++;
+      }
+    });
+    const labels = Object.keys(dateMapKwh).sort();
+    ovCharts.dailyGen = new Chart(canvas, {
+      type: 'bar',
+      data: {
+        labels: labels.map(d => d.slice(5)),
+        datasets: [
+          {
+            label: 'MWh', yAxisID: 'yKwh', order: 2,
+            data: labels.map(d => +(dateMapKwh[d] / 1000).toFixed(1)),
+            backgroundColor: 'rgba(126,87,0,.65)', borderColor: 'rgba(126,87,0,1)', borderWidth: 1, borderRadius: 4
+          },
+          {
+            label: 'Avg DC CUF%', yAxisID: 'yCuf', order: 1, type: 'line',
+            data: labels.map(d => dateMapCuf[d]?.n > 0 ? +(dateMapCuf[d].sum / dateMapCuf[d].n).toFixed(2) : null),
+            borderColor: 'rgba(37,99,235,1)', backgroundColor: 'rgba(37,99,235,.08)',
+            borderWidth: 2, pointRadius: 3, pointBackgroundColor: 'rgba(37,99,235,1)', tension: 0.3
+          }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: true, position: 'top', labels: { font: { size: 10 }, boxWidth: 12 } },
+          tooltip: { callbacks: { label: ctx => ctx.dataset.label === 'Avg DC CUF%' ? ` Avg DC CUF: ${ctx.parsed.y}%` : ` MWh: ${ctx.parsed.y}` } }
+        },
+        scales: {
+          x: { ticks: { font: { size: 9 } } },
+          yKwh: { type: 'linear', position: 'left',  ticks: { font: { size: 9 } }, title: { display: true, text: 'MWh', font: { size: 9 } } },
+          yCuf: { type: 'linear', position: 'right', ticks: { font: { size: 9 }, callback: v => v + '%' }, title: { display: true, text: 'DC CUF%', font: { size: 9 } }, grid: { drawOnChartArea: false } }
+        }
+      }
+    });
+  }
 }
 
 function buildSiteCompChart(sitePerf) {
@@ -518,67 +607,7 @@ async function showInvHealth(siteName) {
   // Store for Excel export
   _invDetailData = { siteName, filterFrom, filterTo, rows };
 
-  const siteCfg = sites.find(s => s.site_name === siteName);
-  const safeId  = siteName.replace(/[^a-zA-Z0-9]/g, '_');
-
-  const blocksHtml = rows.map((r, idx) => {
-    const inv   = r.inv_gen           || [];
-    const strs  = r.inv_strings_count || [];
-    const dcTot = +(r.dc_capacity_kw  || siteCfg?.dc_capacity_kw || 0);
-    const n     = inv.length || 1;
-
-    // Per-inverter metrics
-    const metrics = inv.map((kwh, i) => {
-      const sc  = parseFloat(strs[i]) || 0;
-      const dc  = sc > 0 ? +(sc * 15.4).toFixed(1) : +(dcTot / n).toFixed(1);
-      const cuf = dc > 0 ? +((+kwh / (dc * 24)) * 100).toFixed(2) : 0;
-      return { kwh: +kwh || 0, sc, dc, cuf };
-    });
-
-    const bestCuf   = metrics.length ? Math.max(...metrics.map(m => m.cuf).filter(c => c > 0)) : 0;
-    const totalKwh  = +(r.total_gen_kwh || inv.reduce((a, v) => a + (+v || 0), 0));
-    const dcCuf     = r.dc_cuf_pct || 0;
-    const dateLabel = new Date(r.report_date + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-
-    const blockId  = `invBlock_${safeId}_${idx}`;
-    const expanded = idx === 0; // latest date open by default, rest collapsed
-
-    const invRows = metrics.map((m, i) => {
-      const loss      = bestCuf > 0 && m.cuf > 0 ? +((bestCuf - m.cuf) / bestCuf * 100).toFixed(2) : 0;
-      const icon      = m.kwh === 0 ? '🔴' : loss > 15 ? '🔴' : loss > 4 ? '⚠️' : '✅';
-      const lossColor = loss > 15 ? 'var(--red)' : loss > 4 ? 'var(--orange)' : 'var(--green-dark)';
-      return `<div style="display:flex;align-items:center;flex-wrap:wrap;gap:5px;font-size:11px;padding:5px 0;border-bottom:1px solid var(--border)">
-        <span>${icon}</span>
-        <span style="color:var(--blue);font-weight:700;min-width:38px">Inv ${i + 1}</span>
-        <span style="font-weight:600">${m.kwh.toLocaleString('en-IN')} kWh</span>
-        <span style="color:var(--border)">|</span>
-        <span>Str: <strong>${m.sc}</strong></span>
-        <span style="color:var(--border)">|</span>
-        <span>DC: <strong>${m.dc} kW</strong></span>
-        <span style="color:var(--border)">|</span>
-        <span>CUF: <strong>${m.cuf}%</strong></span>
-        <span style="color:var(--border)">|</span>
-        <span style="color:${lossColor};font-weight:700">Loss: ${loss}%</span>
-      </div>`;
-    }).join('');
-
-    return `
-      <div style="border:1.5px solid var(--border);border-radius:10px;margin-bottom:8px;overflow:hidden">
-        <div onclick="toggleInvBlock('${blockId}')" style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;background:#f8fafc;cursor:pointer;user-select:none">
-          <div style="display:flex;align-items:center;gap:8px">
-            <span id="${blockId}_icon" style="font-size:11px;color:var(--gray)">${expanded ? '▼' : '▶'}</span>
-            <div style="font-size:12px;font-weight:700;color:var(--text)">📅 ${dateLabel}</div>
-          </div>
-          <div style="display:flex;gap:10px;align-items:center;font-size:11px">
-            <span style="font-weight:700;color:var(--primary)">${totalKwh.toLocaleString('en-IN')} kWh</span>
-            <span style="color:var(--gray)">DC CUF: <strong style="color:var(--text)">${dcCuf}%</strong></span>
-          </div>
-        </div>
-        <div id="${blockId}" style="padding:6px 12px 10px;display:${expanded ? 'block' : 'none'}">
-          ${invRows}
-        </div>
-      </div>`;
-  }).join('');
+  const blocksHtml = _buildDateBlocks(rows, siteName);
 
   el.innerHTML = `
     <div class="card" style="border-left:4px solid var(--blue)">
@@ -603,6 +632,128 @@ function toggleInvBlock(id) {
   const isHidden = el.style.display === 'none';
   el.style.display = isHidden ? 'block' : 'none';
   if (icon) icon.textContent = isHidden ? '▼' : '▶';
+}
+
+// ── Shared: build per-date collapsible blocks HTML ────────────
+function _buildDateBlocks(rows, siteName, idPrefix) {
+  const siteCfg = sites.find(s => s.site_name === siteName);
+  const safeId  = idPrefix || siteName.replace(/[^a-zA-Z0-9]/g, '_');
+  return rows.map((r, idx) => {
+    const inv   = r.inv_gen           || [];
+    const strs  = r.inv_strings_count || [];
+    const dcTot = +(r.dc_capacity_kw  || siteCfg?.dc_capacity_kw || 0);
+    const n     = inv.length || 1;
+    const metrics = inv.map((kwh, i) => {
+      const sc  = parseFloat(strs[i]) || 0;
+      const dc  = sc > 0 ? +(sc * 15.4).toFixed(1) : +(dcTot / n).toFixed(1);
+      const cuf = dc > 0 ? +((+kwh / (dc * 24)) * 100).toFixed(2) : 0;
+      return { kwh: +kwh || 0, sc, dc, cuf };
+    });
+    const bestCuf   = metrics.length ? Math.max(...metrics.map(m => m.cuf).filter(c => c > 0)) : 0;
+    const totalKwh  = +(r.total_gen_kwh || inv.reduce((a, v) => a + (+v || 0), 0));
+    const dcCuf     = r.dc_cuf_pct || 0;
+    const dateLabel = new Date(r.report_date + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    const blockId   = `invBlock_${safeId}_${idx}`;
+    const expanded  = idx === 0;
+    const invRows = metrics.map((m, i) => {
+      const loss      = bestCuf > 0 && m.cuf > 0 ? +((bestCuf - m.cuf) / bestCuf * 100).toFixed(2) : 0;
+      const icon      = m.kwh === 0 ? '🔴' : loss > 15 ? '🔴' : loss > 4 ? '⚠️' : '✅';
+      const lossColor = loss > 15 ? 'var(--red)' : loss > 4 ? 'var(--orange)' : 'var(--green-dark)';
+      return `<div style="display:flex;align-items:center;flex-wrap:wrap;gap:5px;font-size:11px;padding:5px 0;border-bottom:1px solid var(--border)">
+        <span>${icon}</span>
+        <span style="color:var(--blue);font-weight:700;min-width:38px">Inv ${i + 1}</span>
+        <span style="font-weight:600">${m.kwh.toLocaleString('en-IN')} kWh</span>
+        <span style="color:var(--border)">|</span><span>Str: <strong>${m.sc}</strong></span>
+        <span style="color:var(--border)">|</span><span>DC: <strong>${m.dc} kW</strong></span>
+        <span style="color:var(--border)">|</span><span>CUF: <strong>${m.cuf}%</strong></span>
+        <span style="color:var(--border)">|</span><span style="color:${lossColor};font-weight:700">Loss: ${loss}%</span>
+      </div>`;
+    }).join('');
+    return `
+      <div style="border:1.5px solid var(--border);border-radius:10px;margin-bottom:6px;overflow:hidden">
+        <div onclick="toggleInvBlock('${blockId}')" style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#f8fafc;cursor:pointer;user-select:none">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span id="${blockId}_icon" style="font-size:11px;color:var(--gray)">${expanded ? '▼' : '▶'}</span>
+            <div style="font-size:12px;font-weight:700;color:var(--text)">📅 ${dateLabel}</div>
+          </div>
+          <div style="display:flex;gap:10px;align-items:center;font-size:11px">
+            <span style="font-weight:700;color:var(--primary)">${totalKwh.toLocaleString('en-IN')} kWh</span>
+            <span style="color:var(--gray)">DC CUF: <strong style="color:var(--text)">${dcCuf}%</strong></span>
+          </div>
+        </div>
+        <div id="${blockId}" style="padding:6px 12px 10px;display:${expanded ? 'block' : 'none'}">${invRows}</div>
+      </div>`;
+  }).join('');
+}
+
+// ── All-sites lazy blocks: one collapsed card per site ────────
+function _buildAllSiteBlocks(sitePerf) {
+  const avg = arr => arr.filter(v => v > 0).length ? +(arr.filter(v => v > 0).reduce((a, b) => a + b, 0) / arr.filter(v => v > 0).length).toFixed(2) : 0;
+  const sum = arr => arr.reduce((a, b) => a + b, 0);
+  return Object.entries(sitePerf)
+    .sort((a, b) => sum(b[1].gens) - sum(a[1].gens))
+    .map(([site, p]) => {
+      const totalKwh = +sum(p.gens).toFixed(0);
+      const avgCuf   = avg(p.dcCufs);
+      const safeId   = 'site_' + site.replace(/[^a-zA-Z0-9]/g, '_');
+      return `
+        <div style="border:1.5px solid var(--border);border-radius:10px;margin-bottom:8px;overflow:hidden">
+          <div onclick="expandSiteBlock('${site.replace(/'/g,"\\'")}','${safeId}')"
+               style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;background:#f8fafc;cursor:pointer;user-select:none">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span id="${safeId}_icon" style="font-size:11px;color:var(--gray)">▶</span>
+              <div style="font-size:12px;font-weight:700;color:var(--blue)">${escHtml(site)}</div>
+            </div>
+            <div style="display:flex;gap:10px;align-items:center;font-size:11px">
+              <span style="font-weight:700;color:var(--primary)">${totalKwh.toLocaleString('en-IN')} kWh</span>
+              <span style="color:var(--gray)">DC CUF: <strong style="color:var(--text)">${avgCuf}%</strong></span>
+            </div>
+          </div>
+          <div id="${safeId}" style="display:none;padding:6px 12px 10px"></div>
+        </div>`;
+    }).join('');
+}
+
+function filterSiteBlocks(query) {
+  const q = (query || '').toLowerCase().trim();
+  const blocks = document.querySelectorAll('#ovSiteBlocks > div');
+  let visible = 0;
+  blocks.forEach(b => {
+    const name = b.querySelector('[style*="color:var(--blue)"]')?.innerText?.toLowerCase() || '';
+    const show = !q || name.includes(q);
+    b.style.display = show ? '' : 'none';
+    if (show) visible++;
+  });
+  const noResult = document.getElementById('ovSiteNoResult');
+  if (noResult) noResult.style.display = visible === 0 ? 'block' : 'none';
+}
+
+async function expandSiteBlock(siteName, blockId) {
+  const el   = document.getElementById(blockId);
+  const icon = document.getElementById(blockId + '_icon');
+  if (!el) return;
+  const isOpen = el.style.display !== 'none';
+  // Toggle collapse
+  if (isOpen) { el.style.display = 'none'; if (icon) icon.textContent = '▶'; return; }
+  el.style.display = 'block';
+  if (icon) icon.textContent = '▼';
+  // Already loaded — no re-fetch
+  if (el.dataset.loaded) return;
+  el.innerHTML = '<div style="text-align:center;color:var(--gray);font-size:11px;padding:10px">Loading…</div>';
+  const filterFrom = document.getElementById('ovFrom')?.value || '';
+  const filterTo   = document.getElementById('ovTo')?.value   || '';
+  const { data: rows } = await sb.from('dgr_submissions')
+    .select('report_date,inv_gen,inv_strings_count,total_gen_kwh,dc_cuf_pct,dc_capacity_kw')
+    .eq('site_name', siteName)
+    .gte('report_date', filterFrom)
+    .lte('report_date', filterTo)
+    .order('report_date', { ascending: false });
+  if (!rows || !rows.length) {
+    el.innerHTML = '<div style="text-align:center;color:var(--gray);font-size:11px;padding:10px">No data in range</div>';
+  } else {
+    el.innerHTML = _buildDateBlocks(rows, siteName, blockId);
+  }
+  el.dataset.loaded = '1';
 }
 
 function downloadInvExcel() {
@@ -658,21 +809,55 @@ function switchOvTab(tab) {
   // Rebuild charts on tab switch if needed
   setTimeout(() => {
     if (tab === 'compliance' && !ovCharts.dailyComp) buildDailyCompChart(ovAllRows);
-    if (tab === 'performance' && !ovCharts.dailyGen) {
-      buildDailyGenChart(ovAllRows);
-      buildSiteCompChart(ovSitePerf);
+    if (tab === 'performance') {
+      const _fs = document.getElementById('ovSite')?.value || '';
+      if (_fs && !ovCharts.dailyGen) buildDailyGenChart(ovAllRows, _fs);
+      if (!ovCharts.siteComp) buildSiteCompChart(ovSitePerf);
     }
   }, 50);
 }
 
 // ── Filter Apply ──────────────────────────────────────────────
 function applyOvFilters() {
-  const site = document.getElementById('ovSite')?.value || '';
+  const site = _ovSite || '';
   const from = document.getElementById('ovFrom')?.value || '';
-  const to = document.getElementById('ovTo')?.value || '';
+  const to   = document.getElementById('ovTo')?.value   || '';
   const el = document.getElementById('screenOverview');
   if (el) el.innerHTML = `<div style="text-align:center;padding:60px;color:var(--gray)">Loading...</div>`;
   Object.values(ovCharts).forEach(c => { try { c.destroy(); } catch(e){} });
   ovCharts = {};
   renderOverview(site, from, to);
+}
+
+// ── Searchable site dropdown ──────────────────────────────────
+function showSiteDd() {
+  const dd = document.getElementById('ovSiteDd');
+  if (!dd) return;
+  dd.style.display = 'block';
+  // Reset all items visible
+  dd.querySelectorAll('div').forEach(d => d.style.display = '');
+}
+function hideSiteDd() {
+  const dd = document.getElementById('ovSiteDd');
+  if (dd) dd.style.display = 'none';
+  // Restore input text to current selection
+  const inp = document.getElementById('ovSiteInput');
+  if (inp) inp.value = _ovSite || '';
+}
+function filterSiteDd(q) {
+  const dd = document.getElementById('ovSiteDd');
+  if (!dd) return;
+  dd.style.display = 'block';
+  const ql = (q || '').toLowerCase();
+  dd.querySelectorAll('div').forEach(d => {
+    const txt = (d.textContent || '').toLowerCase();
+    d.style.display = (!ql || txt.includes(ql)) ? '' : 'none';
+  });
+}
+function selectOvSite(siteName) {
+  _ovSite = siteName;
+  const inp = document.getElementById('ovSiteInput');
+  if (inp) inp.value = siteName || '';
+  hideSiteDd();
+  applyOvFilters();
 }
