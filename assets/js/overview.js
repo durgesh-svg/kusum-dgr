@@ -55,7 +55,14 @@ async function renderOverview(filterSite = '', filterFrom = '', filterTo = '') {
   if (!el) return;
   const def = getDefaultDates();
   filterFrom = filterFrom || def.from;
-  filterTo = filterTo || def.to;
+  filterTo   = filterTo   || def.to;
+
+  // Range days count (inclusive)
+  const rangeDays = (filterFrom && filterTo)
+    ? Math.round((new Date(filterTo) - new Date(filterFrom)) / 86400000) + 1
+    : 0;
+  const fromLabel = filterFrom ? new Date(filterFrom + 'T00:00:00').toLocaleDateString('en-IN', { day:'numeric', month:'short' }) : '';
+  const toLabel   = filterTo   ? new Date(filterTo   + 'T00:00:00').toLocaleDateString('en-IN', { day:'numeric', month:'short' }) : '';
 
   // Destroy existing charts
   Object.values(ovCharts).forEach(c => { try { c.destroy(); } catch(e){} });
@@ -164,7 +171,10 @@ async function renderOverview(filterSite = '', filterFrom = '', filterTo = '') {
 
         <!-- Engineer Summary -->
         <div class="card" style="margin-bottom:10px">
-          <div class="card-title" style="margin-bottom:8px">Engineer-wise Summary</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:4px">
+            <div class="card-title" style="margin-bottom:0">Engineer-wise Summary</div>
+            <span style="font-size:10px;color:var(--gray);background:var(--border);padding:3px 8px;border-radius:20px;font-weight:600">📅 ${rangeDays} days &nbsp;${fromLabel} – ${toLabel}</span>
+          </div>
           <div style="overflow-x:auto">
             <div style="min-width:500px">
               <div class="ov-eng-row ov-table-header">
