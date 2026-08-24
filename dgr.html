@@ -231,6 +231,14 @@ label{display:block;font-size:10px;color:var(--text-muted);font-weight:500;margi
 .mod-grid{display:grid;grid-template-columns:32px 1fr 1fr;align-items:center;gap:4px 5px;margin-top:6px}
 .mod-header{font-size:9px;color:var(--gray);text-transform:uppercase;font-weight:700;padding-bottom:4px;border-bottom:1.5px solid var(--border)}
 /* Settings list */
+.dev-bar{position:fixed;left:0;right:0;bottom:0;z-index:300;background:#1e293b;color:#fff;
+  display:flex;align-items:center;gap:6px;padding:6px 10px calc(6px + env(safe-area-inset-bottom,0px));
+  font-size:10px;flex-wrap:wrap}
+.dev-bar b{font-weight:700;letter-spacing:.05em;color:#fbbf24;text-transform:uppercase;font-size:9px}
+.dev-bar button{font:inherit;font-size:10px;font-weight:600;cursor:pointer;padding:4px 9px;
+  border-radius:6px;border:1px solid #475569;background:#334155;color:#cbd5e1}
+.dev-bar button.on{background:#fbbf24;color:#1e293b;border-color:#fbbf24}
+.dev-bar .real{margin-left:auto;opacity:.6;white-space:nowrap}
 .settings-item{display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--gray-light)}
 .settings-item-text{font-size:11px;color:var(--text)}
 /* ── HOME HEADER ── */
@@ -376,6 +384,8 @@ label{display:block;font-size:10px;color:var(--text-muted);font-weight:500;margi
   <div id="screenApprovals" class="screen screen-padded hidden"></div>
   <div id="screenAdmin" class="screen screen-padded hidden"></div>
   <div id="screenInsights" class="screen screen-padded hidden"></div>
+  <div id="screenTickets" class="screen screen-padded hidden"></div>
+  <div id="screenReview" class="screen screen-padded hidden"></div>
 </div>
 <input type="file" id="dgrHistCsvInput" accept=".csv" class="hidden" onchange="handleDgrHistCSV(event)">
 <div id="navBar" class="nav-bar hidden">
@@ -405,6 +415,7 @@ label{display:block;font-size:10px;color:var(--text-muted);font-weight:500;margi
   <div class="modal-content" id="modalContent" onclick="event.stopPropagation()"></div>
 </div>
 <input type="file" id="photoInput" accept="image/*" class="hidden" onchange="handlePhoto(event)">
+<input type="file" id="ticketPhotoInput" accept="image/*" class="hidden" onchange="handleTicketPhoto(event)">
 <input type="file" id="csvInput" accept=".csv" class="hidden" onchange="handleCSV(event)">
 <input type="file" id="siteCsvInput" accept=".csv" class="hidden" onchange="handleSiteBulkCSV(event)">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -424,21 +435,39 @@ const DEFAULT_SITES=['Jamola','Dausar','Haspur','Pahel','Khakholi','Jetpura','Si
 const DEFAULT_GRID_REASONS=['Grid failure','GSS maintenance','Supply outage from 132 kV','Supply outage from 33 kV','Grid overvoltage','Grid undervoltage','Others'];
 const DEFAULT_FAULT_CODES=['DO fuse burn','VCB fault (Plant end)','VCB fault (GSS end)','Termination kit failure','Transformer failure','LT panel fault','Inverter fault','Other faults'];
 const MOG_OPTIONS=['Below 1/4','At 1/4','Between 1/4 & 1/2','At 1/2','Between 1/2 & 3/4','At 3/4','Above 3/4','Full'];
+const DEFAULT_TICKET_CATEGORIES=['Repair','Spare part','Expense','Other'];
+const DEFAULT_L2_THRESHOLD=5000;
 
 let session=null;
 let sites=[];
 let currentScreen=0;
 let currentTab='dgr';
 
+// ── ROLES ─────────────────────────────────────────────────────────────────────
+// director > admin > manager > engineer.
+// super_admin is treated as admin and employee as engineer, so accounts created
+// by the other app sharing this users table degrade sensibly instead of falling
+// through to the lowest tier.
+const ROLE_RANK={engineer:1,employee:1,manager:2,admin:3,super_admin:3,director:4};
+const ROLE_LABEL={engineer:'Site Engineer',employee:'Site Engineer',manager:'Manager',
+                  admin:'Admin',super_admin:'Admin',director:'Director'};
+function roleRank(r){return ROLE_RANK[r]||1;}
+function isEngineer(){return roleRank(session&&session.role)<=1;}
+function isManagerUp(){return roleRank(session&&session.role)>=2;}
+function isAdminUp(){return roleRank(session&&session.role)>=3;}
+function isDirector(){return roleRank(session&&session.role)>=4;}
+
 // ── Hash-based routing ────────────────────────────────────────────────────────
 function navTo(hash){const t='#'+hash;if(window.location.hash!==t)history.pushState(null,'',t);}
 function handleHashNav(){
   const raw=(window.location.hash||'').replace('#','').trim();
   const [page,sub]=(raw||'dgr').split('/');
-  if(page==='history')switchTab('history');
-  else if(page==='approvals'&&session&&(session.role==='admin'||session.role==='manager'))switchTab('approvals');
-  else if(page==='admin'&&session&&session.role==='admin'){if(sub)adminTab=sub;switchTab('admin');}
-  else if(page==='insights'&&session&&(session.role==='admin'||session.role==='manager'))switchTab('insights');
+  if(page==='review'&&session&&isManagerUp()){if(sub)reviewTab=sub;switchTab('review');}
+  else if(page==='history')switchTab(isManagerUp()?'review':'history');
+  else if(page==='approvals'&&session&&isManagerUp()){reviewTab='approvals';switchTab('review');}
+  else if(page==='tickets'){switchTab('tickets');if(sub)setTimeout(()=>viewTicket(sub),0);}
+  else if(page==='admin'&&session&&isAdminUp()){if(sub)adminTab=sub;switchTab('admin');}
+  else if(page==='insights'&&session&&isManagerUp())switchTab('insights');
   else switchTab('dgr');
 }
 window.addEventListener('popstate',()=>{if(session&&session.loggedIn)handleHashNav();});
@@ -446,7 +475,8 @@ let formData={};
 let photoFiles={};  // keyed by slot name
 let acknowledgements={inv_zero:false,pr_low:false,temp_high:false};
 let todaySubmissions={};
-let appSettings={grid_outage_reasons:[...DEFAULT_GRID_REASONS],plant_fault_codes:[...DEFAULT_FAULT_CODES]};
+let appSettings={grid_outage_reasons:[...DEFAULT_GRID_REASONS],plant_fault_codes:[...DEFAULT_FAULT_CODES],
+  ticket_categories:[...DEFAULT_TICKET_CATEGORIES],ticket_l2_threshold:DEFAULT_L2_THRESHOLD};
 let progressDate=new Date().toISOString().split('T')[0]; // selected date for home progress widget
 let show5Day=false; // 5-day panel toggle
 let insightsDays=30;
@@ -472,8 +502,9 @@ async function doLogin(){
   const hash=await hashPassword(pw);
   const{data,error}=await sb.from('users').select('*').eq('phone',phone).single();
   if(error||!data){errEl.textContent='User not found';errEl.classList.remove('hidden');return;}
-  if(data.password_hash!==hash){errEl.textContent='Incorrect password';errEl.classList.remove('hidden');return;}
-  session={phone:data.phone,name:data.name,role:data.role,assigned_sites:data.assigned_sites||[],loggedIn:true,userId:data.id,must_change_pw:data.must_change_pw};
+  if(data.active===false){errEl.textContent='This account has been deactivated. Contact your admin.';errEl.classList.remove('hidden');return;}
+  if(!data.password_hash||data.password_hash!==hash){errEl.textContent='Incorrect password';errEl.classList.remove('hidden');return;}
+  session={phone:data.phone,name:data.name,role:data.role,active:data.active!==false,assigned_sites:data.assigned_sites||[],loggedIn:true,userId:data.id,must_change_pw:data.must_change_pw};
   localStorage.setItem('dgr_session',JSON.stringify(session));
   if(session.must_change_pw){
     document.getElementById('loginScreen').classList.add('hidden');
@@ -509,6 +540,7 @@ async function enterApp(){
   document.getElementById('appWrap').classList.remove('hidden');
   await Promise.all([loadSites(),loadAppSettings()]);
   buildBottomTabs();
+  buildDevBar();
   handleHashNav();
 }
 async function loadSites(){
@@ -536,6 +568,8 @@ async function loadAppSettings(){
         const v=r.value;
         if(r.key==='grid_outage_reasons'&&v)appSettings.grid_outage_reasons=v;
         if(r.key==='plant_fault_codes'&&v)appSettings.plant_fault_codes=v;
+        if(r.key==='ticket_categories'&&v)appSettings.ticket_categories=v;
+        if(r.key==='ticket_l2_threshold'&&v!=null)appSettings.ticket_l2_threshold=Number(v)||0;
         if(r.key==='sheets_script_url')sheetsSettings.script_url=typeof v==='string'?v:(v||'');
         if(r.key==='sheets_sheet_id')sheetsSettings.sheet_id=typeof v==='string'?v:'1agcGb0nTi1u-hEOlHU1eXt30wsWyEeK_';
         if(r.key==='sheets_tab_name')sheetsSettings.tab_name=typeof v==='string'?v:'Raw Data';
@@ -547,7 +581,7 @@ async function loadAppSettings(){
   }catch(e){
     // fallback to localStorage if DB unavailable
     const cached=localStorage.getItem("dgr_app_settings");
-    if(cached){try{const s=JSON.parse(cached);if(s.grid_outage_reasons)appSettings.grid_outage_reasons=s.grid_outage_reasons;if(s.plant_fault_codes)appSettings.plant_fault_codes=s.plant_fault_codes;}catch(e2){}}
+    if(cached){try{const s=JSON.parse(cached);if(s.grid_outage_reasons)appSettings.grid_outage_reasons=s.grid_outage_reasons;if(s.plant_fault_codes)appSettings.plant_fault_codes=s.plant_fault_codes;if(s.ticket_categories)appSettings.ticket_categories=s.ticket_categories;if(s.ticket_l2_threshold!=null)appSettings.ticket_l2_threshold=s.ticket_l2_threshold;}catch(e2){}}
   }
 }
 let sheetsSettings={script_url:'',sheet_id:'1agcGb0nTi1u-hEOlHU1eXt30wsWyEeK_',tab_name:'Raw Data',last_sync:''};
@@ -557,20 +591,21 @@ function buildBottomTabs(){
   const el=document.getElementById('bottomTabs');
   let tabs=[
     {id:'dgr',label:'DGR',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>'},
-    {id:'history',label:'History',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>'}
+    (isManagerUp()
+      ?{id:'review',label:'Review',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><path d="M9 14l2 2 4-4"/><path d="M9 5a2 2 0 002 2h2a2 2 0 002-2"/></svg>'}
+      :{id:'history',label:'History',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>'}),
+    {id:'tickets',label:'Tickets',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9V7a2 2 0 012-2h12a2 2 0 012 2v2a2 2 0 000 4v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2a2 2 0 000-4z"/><path d="M13 5v14"/></svg>'}
   ];
-  if(session.role==='manager'||session.role==='admin')
-    tabs.push({id:'approvals',label:'Approvals',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>'});
-  if(session.role==='manager'||session.role==='admin')
+  if(isManagerUp())
     tabs.push({id:'insights',label:'Insights',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 16l4-4 4 4 4-8"/></svg>'});
-  if(session.role==='admin')
+  if(isAdminUp())
     tabs.push({id:'admin',label:'Admin',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197"/></svg>'});
   el.innerHTML=tabs.map(t=>`<div class="bottom-tab${t.id==='dgr'?' active':''}" data-tab="${t.id}" onclick="switchTab('${t.id}')">${t.icon}<span>${t.label}</span></div>`).join('');
   el.classList.remove('hidden');
 }
 function switchTab(tab){
   currentTab=tab;
-  if(tab!=='admin')navTo(tab); // admin hash set by showAdmin() with sub-tab
+  if(tab!=='admin'&&tab!=='review')navTo(tab); // these set their own sub-tab hash
   document.querySelectorAll('.bottom-tab').forEach(t=>{t.classList.toggle('active',t.dataset.tab===tab);});
   document.querySelectorAll('#screensWrap > div').forEach(d=>d.classList.add('hidden'));
   document.getElementById('headerBar').classList.add('hidden');
@@ -578,6 +613,8 @@ function switchTab(tab){
   document.getElementById('bottomTabs').classList.remove('hidden');
   if(tab==='dgr')showHomeScreen();
   else if(tab==='history')showHistory();
+  else if(tab==='tickets')showTickets();
+  else if(tab==='review')showReview();
   else if(tab==='approvals')showApprovals();
   else if(tab==='admin')showAdmin();
   else if(tab==='insights')showInsights();
@@ -590,7 +627,7 @@ async function showHomeScreen(){
   document.getElementById('navBar').classList.add('hidden');
   const el=document.getElementById('screen0');
   el.classList.remove('hidden');
-  const mySites=session.role==='engineer'?sites.filter(s=>session.assigned_sites.includes(s.site_name)):sites;
+  const mySites=isEngineer()?sites.filter(s=>(session.assigned_sites||[]).includes(s.site_name)):sites;
   const todayStr=new Date().toISOString().split('T')[0];
   const isToday=progressDate===todayStr;
   const dateLabel=isToday?'Today':new Date(progressDate+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'});
@@ -598,6 +635,17 @@ async function showHomeScreen(){
     const{data}=await sb.from('dgr_submissions').select('site_name,status,submitted_by_name,created_at').eq('report_date',progressDate);
     todaySubmissions={};
     if(data)data.forEach(d=>{todaySubmissions[d.site_name]=d;});
+  }catch(e){}
+  // Open tickets across the user's sites — live issues, not tied to progressDate
+  let openTickets=0;
+  try{
+    const siteNames=mySites.map(s=>s.site_name);
+    if(siteNames.length>0){
+      const{count}=await sb.from('dgr_tickets').select('id',{count:'exact',head:true})
+        .in('status',['open','l1_approved','approved','closure_requested'])
+        .in('site_name',siteNames);
+      openTickets=count||0;
+    }
   }catch(e){}
   let approved=0,pending=0,notDone=0;
   mySites.forEach(s=>{
@@ -640,6 +688,7 @@ async function showHomeScreen(){
         <span class="hpchip hpchip-green">✓ ${approved} Approved</span>
         <span class="hpchip hpchip-amber">◷ ${pending} Pending</span>
         <span class="hpchip hpchip-gray">○ ${notDone} Not done</span>
+        ${openTickets>0?`<span class="hpchip hpchip-amber" style="cursor:pointer" onclick="switchTab('tickets')">⚑ ${openTickets} Open ticket${openTickets===1?'':'s'}</span>`:''}
       </div>
       ${show5Day?await build5DayPanel(mySites):''}
     </div>
@@ -690,7 +739,7 @@ async function build5DayPanel(mySites){
   const base=new Date(progressDate+'T00:00:00');
   for(let i=0;i<5;i++){const d=new Date(base);d.setDate(base.getDate()-i);dates.push(d.toISOString().split('T')[0]);}
   let q=sb.from('dgr_submissions').select('site_name,status,report_date').in('report_date',dates);
-  if(session.role==='engineer')q=q.eq('submitted_by_phone',session.phone);
+  if(isEngineer())q=q.eq('submitted_by_phone',session.phone);
   let data=[];
   try{const r=await q;data=r.data||[];}catch(e){}
   const byDate={};
@@ -864,7 +913,7 @@ function goNext(){if(currentScreen===9){submitReport();return;}if(currentScreen<
 // SCREEN 1: SITE & DATE
 function buildScreen1(){
   const el=document.getElementById('screen1');
-  const mySites=session.role==='engineer'?sites.filter(s=>session.assigned_sites.includes(s.site_name)):sites;
+  const mySites=isEngineer()?sites.filter(s=>(session.assigned_sites||[]).includes(s.site_name)):sites;
   const site=sites.find(s=>s.site_name===formData.site_name);
   el.innerHTML=`
     <div class="card">
@@ -1280,7 +1329,7 @@ function buildScreen6(){
   cycles.forEach(c=>{
     const state=cycleState(c.start,c.end);
     const curStatus=formData[c.statusKey]||'not-started';
-    const isLocked=state==='future'||(curStatus==='complete'&&session.role==='engineer');
+    const isLocked=state==='future'||(curStatus==='complete'&&isEngineer());
     let badgeCls='badge-gray';
     if(state==='active')badgeCls='badge-blue';
     if(curStatus==='complete')badgeCls='badge-green';
@@ -1670,12 +1719,13 @@ function shareWhatsApp(){window.open('https://wa.me/?text='+encodeURIComponent(b
 function escHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 // HISTORY
 let historyFilters={site:'',date:''};
-function showHistory(){
-  const el=document.getElementById('screenHistory');
-  el.classList.remove('hidden');
+function showHistory(target){
+  // `target` lets the combined Review tab host this view; standalone otherwise
+  const el=target||document.getElementById('screenHistory');
+  if(!target)el.classList.remove('hidden');
   // Build available site list for dropdown
   let siteOptions='<option value="">All sites</option>';
-  const siteList=session.role==='engineer'
+  const siteList=isEngineer()
     ?(session.assigned_sites||[])
     :sites.map(s=>s.site_name);
   siteList.forEach(s=>{siteOptions+=`<option value="${s}"${historyFilters.site===s?' selected':''}>${s}</option>`;});
@@ -1696,7 +1746,7 @@ function showHistory(){
       </div>
       <button class="btn btn-primary" style="width:100%;padding:8px;font-size:12px" onclick="loadHistory()">Search</button>
     </div>
-    ${(session.role==='manager'||session.role==='admin')?buildDownloadPanel():''}
+    ${isManagerUp()?buildDownloadPanel():''}
     <div id="historyResults"><div style="text-align:center;color:var(--gray);padding:20px">Press Search to load results</div></div>`;
   loadHistory();
 }
@@ -1706,7 +1756,7 @@ async function loadHistory(){
   el.innerHTML='<div style="text-align:center;color:var(--gray);padding:20px">Loading...</div>';
   try{
     let query=sb.from('dgr_submissions').select('*').order('report_date',{ascending:false}).limit(100);
-    if(session.role==='engineer')query=query.eq('submitted_by_phone',session.phone);
+    if(isEngineer())query=query.eq('submitted_by_phone',session.phone);
     if(historyFilters.site)query=query.eq('site_name',historyFilters.site);
     if(historyFilters.date)query=query.eq('report_date',historyFilters.date);
     const{data}=await query;
@@ -1734,19 +1784,21 @@ async function loadHistory(){
 
 // APPROVALS
 let approvalFilter='pending';
+let _approvalsRefresh='showApprovals';   // who re-renders after approve/reject
 async function showApprovals(){
   const el=document.getElementById('screenApprovals');
   el.classList.remove('hidden');
-  await renderApprovals(el,false);
+  await renderApprovals(el,false,'showApprovals');
 }
-async function renderApprovals(el,inAdmin){
+async function renderApprovals(el,inAdmin,refreshFn){
+  _approvalsRefresh=refreshFn||(inAdmin?'showApprovalInAdmin':'showApprovals');
   el.innerHTML='<div style="text-align:center;color:var(--gray);padding:20px">Loading...</div>';
   try{
     let query=sb.from('dgr_submissions').select('*').order('created_at',{ascending:false}).limit(100);
     if(approvalFilter!=='all')query=query.eq('status',approvalFilter);
     const{data}=await query;
     const filters=['all','pending','approved','rejected'];
-    const refresh=inAdmin?'showApprovalInAdmin':'showApprovals';
+    const refresh=_approvalsRefresh;
     el.innerHTML=`${!inAdmin?'<div class="card-title">Approvals</div>':''}
       <div class="filter-pills">
         ${filters.map(f=>`<div class="filter-pill${f===approvalFilter?' active':''}" onclick="approvalFilter='${f}';${refresh}()">${f.charAt(0).toUpperCase()+f.slice(1)}</div>`).join('')}
@@ -1757,8 +1809,6 @@ async function renderApprovals(el,inAdmin){
           const flags=[];
           if((d.wti_c||0)>85||(d.oti_c||0)>85)flags.push('<span class="badge badge-red">High temp</span>');
           if((d.pr_pct||0)<70&&(d.pr_pct||0)>0)flags.push('<span class="badge badge-yellow">Low PR</span>');
-          const approveF=inAdmin?'approveAndRefreshAdmin':'approveSubmission';
-          const rejectF=inAdmin?'rejectAndRefreshAdmin':'rejectSubmission';
           return `<div class="approval-card">
             <div class="approval-header">
               <div><div class="approval-site">${d.site_name}</div><div class="approval-meta">${dateStr} · ${d.submitted_by_name||''}</div></div>
@@ -1772,8 +1822,8 @@ async function renderApprovals(el,inAdmin){
             <div class="approval-actions">
               <button class="btn btn-secondary" style="flex:1;padding:8px;font-size:11px" onclick="viewSubmission('${d.id}')">View</button>
               ${d.status==='pending'?`
-              <button class="btn btn-primary" style="flex:1;padding:8px;font-size:11px" onclick="${approveF}('${d.id}')">Approve</button>
-              <button class="btn" style="flex:1;padding:8px;font-size:11px;background:var(--red-light);color:var(--red);border:1px solid var(--red-border)" onclick="${rejectF}('${d.id}')">Reject</button>`:''}
+              <button class="btn btn-primary" style="flex:1;padding:8px;font-size:11px" onclick="approveSubmission('${d.id}')">Approve</button>
+              <button class="btn" style="flex:1;padding:8px;font-size:11px;background:var(--red-light);color:var(--red);border:1px solid var(--red-border)" onclick="rejectSubmission('${d.id}')">Reject</button>`:''}
             </div>
           </div>`;
         }).join('')}`;
@@ -1781,25 +1831,547 @@ async function renderApprovals(el,inAdmin){
 }
 async function approveSubmission(id){
   await sb.from('dgr_submissions').update({status:'approved',reviewed_by:session.name,reviewed_at:new Date().toISOString()}).eq('id',id);
-  showApprovals();
+  window[_approvalsRefresh]();
 }
 async function rejectSubmission(id){
   const note=prompt('Rejection reason:');if(note===null)return;
   await sb.from('dgr_submissions').update({status:'rejected',reviewed_by:session.name,review_note:note,reviewed_at:new Date().toISOString()}).eq('id',id);
-  showApprovals();
-}
-async function approveAndRefreshAdmin(id){
-  await sb.from('dgr_submissions').update({status:'approved',reviewed_by:session.name,reviewed_at:new Date().toISOString()}).eq('id',id);
-  showApprovalInAdmin();
-}
-async function rejectAndRefreshAdmin(id){
-  const note=prompt('Rejection reason:');if(note===null)return;
-  await sb.from('dgr_submissions').update({status:'rejected',reviewed_by:session.name,review_note:note,reviewed_at:new Date().toISOString()}).eq('id',id);
-  showApprovalInAdmin();
+  window[_approvalsRefresh]();
 }
 async function showApprovalInAdmin(){
   const el=document.getElementById('adminContent');
-  await renderApprovals(el,true);
+  await renderApprovals(el,true,'showApprovalInAdmin');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TICKETS — repair / spare / expense requests raised by site engineers
+// ─────────────────────────────────────────────────────────────────────────────
+let ticketFilter='all';
+let ticketSiteFilter='';
+let ticketPhotoFiles={};      // key -> File, for the raise/edit and closure modals
+let _editingTicketId=null;
+let _closureTicketId=null;
+
+const TICKET_PRIORITIES=['low','medium','high','critical'];
+const TICKET_STATUS_META={
+  open:{label:'Open',cls:'badge-yellow'},
+  l1_approved:{label:'Awaiting admin',cls:'badge-blue'},
+  approved:{label:'Approved',cls:'badge-green'},
+  rejected:{label:'Rejected',cls:'badge-red'},
+  closure_requested:{label:'Closure requested',cls:'badge-blue'},
+  closed:{label:'Closed',cls:'badge-gray'},
+  cancelled:{label:'Cancelled',cls:'badge-gray'}
+};
+
+function esc(v){return escHtml(String(v==null?'':v));}
+function ticketNo(t){return '#TKT-'+String(t.ticket_no||0).padStart(4,'0');}
+function ticketThreshold(){const v=Number(appSettings.ticket_l2_threshold);return isNaN(v)?DEFAULT_L2_THRESHOLD:v;}
+function ticketNeedsL2(t){return Number(t.estimated_cost||0)>ticketThreshold();}
+function ticketCategories(){return appSettings.ticket_categories||DEFAULT_TICKET_CATEGORIES;}
+function money(v){return (v==null||v==='')?'—':'₹'+Number(v).toLocaleString('en-IN');}
+function ticketMySites(){return isEngineer()?(session.assigned_sites||[]):sites.map(s=>s.site_name);}
+function isTicketApprover(){return isManagerUp();}
+function ticketStatusBadge(s){const m=TICKET_STATUS_META[s]||{label:s,cls:'badge-gray'};return `<span class="badge ${m.cls}">${esc(m.label)}</span>`;}
+function ticketPriorityBadge(p){
+  const v=p||'medium';
+  const cls=v==='critical'?'badge-red':v==='high'?'badge-yellow':v==='medium'?'badge-blue':'badge-gray';
+  return `<span class="badge ${cls}">${esc(v.charAt(0).toUpperCase()+v.slice(1))}</span>`;
+}
+function ticketAge(t){
+  if(!t.created_at)return '';
+  const days=Math.floor((Date.now()-new Date(t.created_at).getTime())/86400000);
+  return days<=0?'today':days===1?'1 day ago':days+' days ago';
+}
+function ticketDate(d){return d?new Date(d).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}):'—';}
+function ticketStamp(d){return d?new Date(d).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';}
+
+// Statuses that still need action from the logged-in approver
+function ticketAwaitingStatuses(){
+  return isAdminUp()?['open','l1_approved','closure_requested']:['open','closure_requested'];
+}
+
+function showTickets(){
+  const el=document.getElementById('screenTickets');
+  el.classList.remove('hidden');
+  let siteOptions='<option value="">All sites</option>';
+  ticketMySites().forEach(s=>{siteOptions+=`<option value="${esc(s)}"${ticketSiteFilter===s?' selected':''}>${esc(s)}</option>`;});
+  const filters=isTicketApprover()
+    ?[['all','All'],['awaiting','Awaiting me'],['open','Open'],['approved','Approved'],['closed','Closed']]
+    :[['all','All'],['open','Open'],['approved','Approved'],['closed','Closed']];
+  el.innerHTML=`
+    <div class="card-title">Tickets</div>
+    <div class="card" style="padding:10px;margin-bottom:8px">
+      <button class="btn btn-primary" style="width:100%;padding:9px;font-size:12px;margin-bottom:8px" onclick="openTicketModal()">+ Raise ticket</button>
+      <label style="font-size:10px;color:var(--gray);display:block;margin-bottom:2px">Site</label>
+      <select style="width:100%;padding:7px 6px;font-size:12px;border:1px solid var(--border);border-radius:6px;background:#fff" onchange="ticketSiteFilter=this.value;loadTickets()">${siteOptions}</select>
+    </div>
+    <div class="filter-pills" style="flex-wrap:wrap">
+      ${filters.map(([v,l])=>`<div class="filter-pill${ticketFilter===v?' active':''}" onclick="ticketFilter='${v}';showTickets()">${l}</div>`).join('')}
+    </div>
+    <div id="ticketResults"><div style="text-align:center;color:var(--gray);padding:20px">Loading...</div></div>`;
+  loadTickets();
+}
+
+async function loadTickets(){
+  const el=document.getElementById('ticketResults');
+  if(!el)return;
+  el.innerHTML='<div style="text-align:center;color:var(--gray);padding:20px">Loading...</div>';
+  try{
+    let q=sb.from('dgr_tickets').select('*').order('created_at',{ascending:false}).limit(200);
+    if(isEngineer()){
+      const mine=session.assigned_sites||[];
+      if(mine.length===0){el.innerHTML='<div class="card" style="text-align:center;color:var(--gray)">No sites assigned. Contact your admin.</div>';return;}
+      q=q.in('site_name',mine);
+    }
+    if(ticketSiteFilter)q=q.eq('site_name',ticketSiteFilter);
+    if(ticketFilter==='open')q=q.in('status',['open','l1_approved']);
+    else if(ticketFilter==='approved')q=q.in('status',['approved','closure_requested']);
+    else if(ticketFilter==='closed')q=q.in('status',['closed','rejected','cancelled']);
+    else if(ticketFilter==='awaiting')q=q.in('status',ticketAwaitingStatuses());
+    const{data,error}=await q;
+    if(error)throw error;
+    if(!data||data.length===0){el.innerHTML='<div class="card" style="text-align:center;color:var(--gray)">No tickets found</div>';return;}
+    el.innerHTML=data.map(t=>`
+      <div class="history-card" style="cursor:pointer" onclick="viewTicket('${t.id}')">
+        <div class="flex-between">
+          <div style="min-width:0">
+            <div class="history-site">${esc(ticketNo(t))} · ${esc(t.title)}</div>
+            <div class="history-date">${esc(t.site_name)} · ${esc(t.category)} · ${esc(t.raised_by_name||'')} · ${ticketAge(t)}</div>
+          </div>
+          ${ticketStatusBadge(t.status)}
+        </div>
+        <div class="history-stats" style="flex-wrap:wrap">
+          ${ticketPriorityBadge(t.priority)}
+          ${t.estimated_cost!=null?`<span class="badge badge-gray">Est ${money(t.estimated_cost)}</span>`:''}
+          ${t.approved_amount!=null?`<span class="badge badge-green">Appr ${money(t.approved_amount)}</span>`:''}
+          ${t.target_date?`<span class="badge badge-gray">Due ${esc(ticketDate(t.target_date))}</span>`:''}
+        </div>
+      </div>`).join('');
+  }catch(e){el.innerHTML='<div class="error-box">Failed to load tickets</div>';}
+}
+
+// ── Raise / edit ─────────────────────────────────────────────────────────────
+function openTicketModal(id){
+  ticketPhotoFiles={};
+  _editingTicketId=id||null;
+  const modal=document.getElementById('modalOverlay');
+  const content=document.getElementById('modalContent');
+  if(id){
+    content.innerHTML=`<div class="modal-header"><div class="modal-title">Loading...</div><button class="modal-close" onclick="closeModal()">✕</button></div>`;
+    modal.classList.remove('hidden');
+    sb.from('dgr_tickets').select('*').eq('id',id).single().then(({data})=>{content.innerHTML=buildTicketForm(data);});
+  } else {
+    content.innerHTML=buildTicketForm(null);
+    modal.classList.remove('hidden');
+  }
+}
+
+function buildTicketForm(t){
+  const mySites=ticketMySites();
+  const selSite=t?t.site_name:(mySites.length===1?mySites[0]:'');
+  return `
+    <div class="modal-header"><div class="modal-title">${t?'Edit ticket '+esc(ticketNo(t)):'Raise ticket'}</div><button class="modal-close" onclick="closeModal()">✕</button></div>
+    <div class="modal-field"><label>Site *</label>
+      <select id="mTicketSite">
+        <option value="">Select site</option>
+        ${mySites.map(s=>`<option value="${esc(s)}"${selSite===s?' selected':''}>${esc(s)}</option>`).join('')}
+      </select>
+    </div>
+    <div class="modal-field"><label>Category *</label>
+      <select id="mTicketCategory">
+        ${ticketCategories().map(c=>`<option value="${esc(c)}"${t&&t.category===c?' selected':''}>${esc(c)}</option>`).join('')}
+      </select>
+    </div>
+    <div class="modal-field"><label>Title *</label><input id="mTicketTitle" maxlength="140" placeholder="e.g. DO fuse burnt on inverter 3" value="${t?esc(t.title):''}"></div>
+    <div class="modal-field"><label>Description</label><textarea id="mTicketDesc" placeholder="What happened, what is needed">${t?esc(t.description||''):''}</textarea></div>
+    <div style="display:flex;gap:8px">
+      <div class="modal-field" style="flex:1"><label>Priority</label>
+        <select id="mTicketPriority">
+          ${TICKET_PRIORITIES.map(p=>`<option value="${p}"${(t?t.priority:'medium')===p?' selected':''}>${p.charAt(0).toUpperCase()+p.slice(1)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="modal-field" style="flex:1"><label>Target date</label><input type="date" id="mTicketTarget" value="${t&&t.target_date?esc(t.target_date):''}"></div>
+    </div>
+    <div class="modal-field"><label>Estimated cost (₹)</label>
+      <input type="number" inputmode="decimal" min="0" id="mTicketCost" placeholder="Leave blank if no cost" value="${t&&t.estimated_cost!=null?esc(t.estimated_cost):''}">
+      <div class="text-hint" style="margin-top:3px">Above ${money(ticketThreshold())} this needs admin approval as well.</div>
+    </div>
+    <div class="modal-field"><label>Photos</label>
+      <div class="photo-grid" id="ticketPhotoGrid">${buildTicketPhotoGrid()}</div>
+      <div class="text-hint" style="margin-top:3px">Max 5MB each${t&&t.image_urls?' · existing photos are kept':''}</div>
+    </div>
+    <div id="ticketFormError" class="error-box hidden"></div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn btn-secondary" style="flex:1" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" style="flex:1" id="ticketSaveBtn" onclick="saveTicket()">${t?'Save changes':'Raise ticket'}</button>
+    </div>`;
+}
+
+function buildTicketPhotoGrid(){
+  const keys=Object.keys(ticketPhotoFiles);
+  let html=keys.map(k=>`<div class="photo-slot filled" onclick="removeTicketPhoto('${k}')">
+      <span style="font-size:14px">📷</span>
+      <span style="font-size:9px;text-align:center">Photo</span>
+      <span style="font-size:8px">✓ tap to remove</span>
+    </div>`).join('');
+  if(keys.length<4)html+=`<div class="photo-slot empty" onclick="triggerTicketPhoto()">
+      <span style="font-size:18px">+</span>
+      <span style="font-size:9px;text-align:center">Add photo</span>
+    </div>`;
+  return html;
+}
+function triggerTicketPhoto(){document.getElementById('ticketPhotoInput').click();}
+function handleTicketPhoto(e){
+  const file=e.target.files[0];
+  e.target.value='';
+  if(!file)return;
+  if(file.size>5*1024*1024){alert('Photo must be under 5MB');return;}
+  ticketPhotoFiles['p'+Date.now()]=file;
+  refreshTicketPhotoGrid();
+}
+function removeTicketPhoto(key){delete ticketPhotoFiles[key];refreshTicketPhotoGrid();}
+function refreshTicketPhotoGrid(){
+  // Re-render only the grid so typed form values survive
+  const grid=document.getElementById('ticketPhotoGrid');
+  if(grid)grid.innerHTML=buildTicketPhotoGrid();
+}
+
+async function uploadTicketPhotos(ticketId,siteName){
+  const out={};
+  for(const[key,file]of Object.entries(ticketPhotoFiles)){
+    if(!file)continue;
+    const path=`tickets/${siteName}/${ticketId}/${key}_${Date.now()}.jpg`;
+    try{
+      const{error:upErr}=await sb.storage.from('dgr-photos').upload(path,file);
+      if(!upErr){
+        const{data:urlData}=sb.storage.from('dgr-photos').getPublicUrl(path);
+        if(urlData)out[key]=urlData.publicUrl;
+      }
+    }catch(e){}
+  }
+  return out;
+}
+
+async function saveTicket(){
+  const btn=document.getElementById('ticketSaveBtn');
+  const errEl=document.getElementById('ticketFormError');
+  const fail=m=>{errEl.textContent=m;errEl.classList.remove('hidden');btn.disabled=false;btn.textContent=_editingTicketId?'Save changes':'Raise ticket';};
+  errEl.classList.add('hidden');
+  const costRaw=document.getElementById('mTicketCost').value.trim();
+  const payload={
+    site_name:document.getElementById('mTicketSite').value,
+    category:document.getElementById('mTicketCategory').value,
+    title:document.getElementById('mTicketTitle').value.trim(),
+    description:document.getElementById('mTicketDesc').value.trim()||null,
+    priority:document.getElementById('mTicketPriority').value,
+    target_date:document.getElementById('mTicketTarget').value||null,
+    estimated_cost:costRaw===''?null:Number(costRaw)
+  };
+  if(!payload.site_name)return fail('Select a site');
+  if(!payload.title)return fail('Enter a title');
+  if(payload.estimated_cost!=null&&(isNaN(payload.estimated_cost)||payload.estimated_cost<0))return fail('Enter a valid cost');
+  btn.disabled=true;btn.textContent='Saving...';
+  // Save a draft first — protects against connection drops, same as submitReport()
+  try{localStorage.setItem('dgr_ticket_draft',JSON.stringify({payload,savedAt:new Date().toISOString()}));}catch(e){}
+  try{
+    let ticketId=_editingTicketId;
+    if(ticketId){
+      const{error}=await sb.from('dgr_tickets').update(payload).eq('id',ticketId);
+      if(error)throw error;
+    } else {
+      payload.raised_by_phone=session.phone;
+      payload.raised_by_name=session.name;
+      payload.status='open';
+      const{data,error}=await sb.from('dgr_tickets').insert(payload).select('id').single();
+      if(error)throw error;
+      ticketId=data.id;
+    }
+    if(Object.keys(ticketPhotoFiles).length>0){
+      const urls=await uploadTicketPhotos(ticketId,payload.site_name);
+      if(Object.keys(urls).length>0){
+        const{data:cur}=await sb.from('dgr_tickets').select('image_urls').eq('id',ticketId).single();
+        await sb.from('dgr_tickets').update({image_urls:Object.assign({},(cur&&cur.image_urls)||{},urls)}).eq('id',ticketId);
+      }
+    }
+    try{localStorage.removeItem('dgr_ticket_draft');}catch(e){}
+    ticketPhotoFiles={};_editingTicketId=null;
+    closeModal();
+    if(currentTab==='tickets')loadTickets();else switchTab('tickets');
+  }catch(e){
+    const isNet=e.message&&(e.message.includes('fetch')||e.message.includes('network')||e.message.includes('NetworkError'));
+    fail(isNet?'Network error — check your signal and tap again. Your entry is saved.':'Save failed: '+e.message);
+  }
+}
+
+// ── Detail ───────────────────────────────────────────────────────────────────
+async function viewTicket(id){
+  const modal=document.getElementById('modalOverlay');
+  const content=document.getElementById('modalContent');
+  content.innerHTML=`<div class="modal-header"><div class="modal-title">Loading...</div><button class="modal-close" onclick="closeModal()">✕</button></div>`;
+  modal.classList.remove('hidden');
+  const{data:t,error}=await sb.from('dgr_tickets').select('*').eq('id',id).single();
+  if(error||!t){content.innerHTML=`<div class="modal-header"><div class="modal-title">Error</div><button class="modal-close" onclick="closeModal()">✕</button></div><div class="error-box">Could not load ticket</div>`;return;}
+  const{data:comments}=await sb.from('dgr_ticket_comments').select('*').eq('ticket_id',id).order('created_at');
+  content.innerHTML=buildTicketDetail(t,comments||[]);
+  navTo('tickets/'+id);   // keep the ticket shareable / refresh-safe
+}
+
+function buildTicketDetail(t,comments){
+  const row=(l,v)=>`<div class="summary-row"><span class="summary-label">${l}</span><span class="summary-value">${v}</span></div>`;
+  const head=s=>`<div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin:10px 0 4px">${s}</div>`;
+  const photos=t.image_urls?Object.values(t.image_urls):[];
+  return `
+    <div class="modal-header">
+      <div class="modal-title">${esc(ticketNo(t))} ${ticketStatusBadge(t.status)}</div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div style="font-size:13px;font-weight:600;margin-bottom:2px">${esc(t.title)}</div>
+    <div style="font-size:10px;color:var(--gray);margin-bottom:8px">${esc(t.site_name)} · raised by ${esc(t.raised_by_name||'—')} · ${ticketAge(t)}</div>
+    ${head('Details')}
+    ${row('Category',esc(t.category))}
+    ${row('Priority',ticketPriorityBadge(t.priority))}
+    ${row('Target date',esc(t.target_date?ticketDate(t.target_date):'—'))}
+    ${row('Estimated cost',esc(money(t.estimated_cost)))}
+    ${t.approved_amount!=null?row('Approved amount',esc(money(t.approved_amount))):''}
+    ${row('Description',esc(t.description||'—'))}
+    ${photos.length>0?`${head('Photos')}<div style="display:flex;gap:6px;flex-wrap:wrap">${photos.map(u=>`<a href="${esc(u)}" target="_blank" rel="noopener"><img src="${esc(u)}" style="width:72px;height:72px;object-fit:cover;border-radius:7px;border:1px solid var(--border)"></a>`).join('')}</div>`:''}
+    ${head('Approval trail')}
+    ${row('Manager (L1)',t.l1_status==='pending'||!t.l1_status?'<span style="color:var(--gray)">Pending</span>':`${esc(t.l1_status)} · ${esc(t.l1_by_name||'')} <span style="color:var(--gray)">${esc(ticketStamp(t.l1_at))}</span>`)}
+    ${t.l1_remark?row('L1 remark',esc(t.l1_remark)):''}
+    ${row('Admin (L2)',ticketNeedsL2(t)?(t.l2_status==='pending'||!t.l2_status?'<span style="color:var(--gray)">Pending</span>':`${esc(t.l2_status)} · ${esc(t.l2_by_name||'')} <span style="color:var(--gray)">${esc(ticketStamp(t.l2_at))}</span>`):`<span style="color:var(--gray)">Not required (under ${esc(money(ticketThreshold()))})</span>`)}
+    ${t.l2_remark?row('L2 remark',esc(t.l2_remark)):''}
+    ${t.closure_requested_at?row('Closure requested',`${esc(t.closure_requested_by_name||'')} <span style="color:var(--gray)">${esc(ticketStamp(t.closure_requested_at))}</span>`):''}
+    ${t.closure_note?row('Closure note',esc(t.closure_note)):''}
+    ${t.closed_at?row('Closed',`${esc(t.closed_by_name||'')} <span style="color:var(--gray)">${esc(ticketStamp(t.closed_at))}</span>`):''}
+    ${head('Comments')}
+    <div style="max-height:180px;overflow-y:auto;margin-bottom:8px">
+      ${comments.length===0?'<div style="font-size:11px;color:var(--gray)">No comments yet</div>':
+        comments.map(c=>`<div style="border-left:2px solid var(--outline-var);padding:4px 0 4px 8px;margin-bottom:6px">
+          <div style="font-size:10px;color:var(--gray)">${esc(c.author_name||'')} · ${esc(c.author_role||'')} · ${esc(ticketStamp(c.created_at))}</div>
+          <div style="font-size:11px">${esc(c.comment)}</div>
+        </div>`).join('')}
+    </div>
+    <div style="display:flex;gap:6px;align-items:flex-start">
+      <textarea id="ticketCommentInput" placeholder="Add a comment" style="min-height:38px;flex:1"></textarea>
+      <button class="btn btn-secondary" style="padding:9px 12px" onclick="addTicketComment('${t.id}')">Post</button>
+    </div>
+    ${buildTicketActions(t)}`;
+}
+
+function buildTicketActions(t){
+  const r=session.role, isRaiser=t.raised_by_phone===session.phone, approver=isTicketApprover();
+  const btns=[];
+  const red='background:var(--red-light);color:var(--red);border:1px solid var(--red-border)';
+  if(t.status==='open'&&(isRaiser||isAdminUp()))
+    btns.push(`<button class="btn btn-secondary" style="flex:1;padding:9px;font-size:11px" onclick="openTicketModal('${t.id}')">Edit</button>`);
+  if(t.status==='open'&&isRaiser)
+    btns.push(`<button class="btn" style="flex:1;padding:9px;font-size:11px;${red}" onclick="cancelTicket('${t.id}')">Cancel</button>`);
+  if((t.status==='open'||t.status==='l1_approved')&&approver){
+    const label=t.status==='l1_approved'?'Approve (final)':(ticketNeedsL2(t)&&!isAdminUp()?'Approve (L1)':'Approve');
+    if(!(t.status==='l1_approved'&&!isAdminUp()))
+      btns.push(`<button class="btn btn-primary" style="flex:1;padding:9px;font-size:11px" onclick="approveTicket('${t.id}')">${label}</button>`);
+    btns.push(`<button class="btn" style="flex:1;padding:9px;font-size:11px;${red}" onclick="rejectTicket('${t.id}')">Reject</button>`);
+  }
+  if(t.status==='approved'&&(isRaiser||approver))
+    btns.push(`<button class="btn btn-primary" style="flex:1;padding:9px;font-size:11px" onclick="openClosureModal('${t.id}')">Request closure</button>`);
+  if(t.status==='closure_requested'&&approver){
+    btns.push(`<button class="btn btn-primary" style="flex:1;padding:9px;font-size:11px" onclick="confirmTicketClosure('${t.id}')">Confirm closure</button>`);
+    btns.push(`<button class="btn btn-secondary" style="flex:1;padding:9px;font-size:11px" onclick="reopenTicket('${t.id}')">Reopen</button>`);
+  }
+  if(t.status==='l1_approved'&&!isAdminUp())
+    btns.push(`<div style="flex:1;font-size:10px;color:var(--gray);text-align:center;padding:9px">Waiting on admin — above ${esc(money(ticketThreshold()))}</div>`);
+  if(btns.length===0)return '';
+  return `<div style="display:flex;gap:6px;margin-top:14px;flex-wrap:wrap">${btns.join('')}</div>`;
+}
+
+// ── Mutations ────────────────────────────────────────────────────────────────
+async function afterTicketChange(id){
+  if(currentTab==='tickets')loadTickets();
+  await viewTicket(id);
+}
+
+function promptApprovedAmount(t){
+  const def=t.estimated_cost!=null?String(t.estimated_cost):'';
+  const raw=prompt('Approved amount (₹) — leave blank if there is no cost:',def);
+  if(raw===null)return{cancelled:true};
+  const s=raw.trim();
+  if(s==='')return{cancelled:false,amount:null};
+  const n=Number(s);
+  if(isNaN(n)||n<0){alert('Enter a valid amount');return{cancelled:true};}
+  return{cancelled:false,amount:n};
+}
+
+async function approveTicket(id){
+  const{data:t}=await sb.from('dgr_tickets').select('*').eq('id',id).single();
+  if(!t)return;
+  if(!isTicketApprover()){alert('Only a manager or admin can approve');return;}
+  const now=new Date().toISOString();
+  const needsL2=ticketNeedsL2(t);
+  const upd={};
+  if(t.status==='open'){
+    const remark=prompt('Approval remark (optional):');
+    if(remark===null)return;
+    upd.l1_status='approved';upd.l1_by_name=session.name;upd.l1_at=now;upd.l1_remark=remark.trim()||null;
+    if(needsL2&&!isAdminUp()){
+      upd.status='l1_approved';   // manager can only clear L1 above the threshold
+    } else {
+      const amt=promptApprovedAmount(t);
+      if(amt.cancelled)return;
+      upd.status='approved';upd.approved_amount=amt.amount;
+      if(needsL2){upd.l2_status='approved';upd.l2_by_name=session.name;upd.l2_at=now;upd.l2_remark=remark.trim()||null;}
+    }
+  } else if(t.status==='l1_approved'){
+    if(!isAdminUp()){alert('Only an Admin or Director can give final approval above '+money(ticketThreshold()));return;}
+    const remark=prompt('Final approval remark (optional):');
+    if(remark===null)return;
+    const amt=promptApprovedAmount(t);
+    if(amt.cancelled)return;
+    upd.l2_status='approved';upd.l2_by_name=session.name;upd.l2_at=now;upd.l2_remark=remark.trim()||null;
+    upd.status='approved';upd.approved_amount=amt.amount;
+  } else return;
+  const{error}=await sb.from('dgr_tickets').update(upd).eq('id',id);
+  if(error){alert('Approve failed: '+error.message);return;}
+  await afterTicketChange(id);
+}
+
+async function rejectTicket(id){
+  if(!isTicketApprover()){alert('Only a manager or admin can reject');return;}
+  const{data:t}=await sb.from('dgr_tickets').select('status').eq('id',id).single();
+  if(!t)return;
+  const note=prompt('Rejection reason:');
+  if(note===null)return;
+  if(!note.trim()){alert('A reason is required');return;}
+  const now=new Date().toISOString();
+  const upd={status:'rejected'};
+  if(t.status==='l1_approved'){upd.l2_status='rejected';upd.l2_by_name=session.name;upd.l2_at=now;upd.l2_remark=note.trim();}
+  else{upd.l1_status='rejected';upd.l1_by_name=session.name;upd.l1_at=now;upd.l1_remark=note.trim();}
+  const{error}=await sb.from('dgr_tickets').update(upd).eq('id',id);
+  if(error){alert('Reject failed: '+error.message);return;}
+  await afterTicketChange(id);
+}
+
+async function cancelTicket(id){
+  if(!confirm('Cancel this ticket?'))return;
+  const{error}=await sb.from('dgr_tickets').update({status:'cancelled'}).eq('id',id);
+  if(error){alert('Cancel failed: '+error.message);return;}
+  await afterTicketChange(id);
+}
+
+// Closure request carries a note plus optional proof photos
+function openClosureModal(id){
+  ticketPhotoFiles={};
+  _closureTicketId=id;
+  const content=document.getElementById('modalContent');
+  content.innerHTML=`
+    <div class="modal-header"><div class="modal-title">Request closure</div><button class="modal-close" onclick="closeModal()">✕</button></div>
+    <div class="modal-field"><label>What was done? *</label><textarea id="mClosureNote" placeholder="Work completed, parts used, bill reference"></textarea></div>
+    <div class="modal-field"><label>Proof photos / bill</label>
+      <div class="photo-grid" id="ticketPhotoGrid">${buildTicketPhotoGrid()}</div>
+      <div class="text-hint" style="margin-top:3px">Max 5MB each</div>
+    </div>
+    <div id="ticketFormError" class="error-box hidden"></div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn btn-secondary" style="flex:1" onclick="viewTicket('${id}')">Back</button>
+      <button class="btn btn-primary" style="flex:1" id="closureSaveBtn" onclick="submitTicketClosure()">Submit</button>
+    </div>`;
+  document.getElementById('modalOverlay').classList.remove('hidden');
+}
+
+async function submitTicketClosure(){
+  const id=_closureTicketId;
+  const btn=document.getElementById('closureSaveBtn');
+  const errEl=document.getElementById('ticketFormError');
+  const note=document.getElementById('mClosureNote').value.trim();
+  if(!note){errEl.textContent='Describe what was done';errEl.classList.remove('hidden');return;}
+  btn.disabled=true;btn.textContent='Submitting...';
+  try{
+    const{data:t}=await sb.from('dgr_tickets').select('site_name,image_urls').eq('id',id).single();
+    let images=(t&&t.image_urls)||{};
+    if(Object.keys(ticketPhotoFiles).length>0){
+      const urls=await uploadTicketPhotos(id,t.site_name);
+      images=Object.assign({},images,urls);
+    }
+    const{error}=await sb.from('dgr_tickets').update({
+      status:'closure_requested',
+      closure_note:note,
+      closure_requested_at:new Date().toISOString(),
+      closure_requested_by_name:session.name,
+      image_urls:Object.keys(images).length>0?images:null
+    }).eq('id',id);
+    if(error)throw error;
+    ticketPhotoFiles={};_closureTicketId=null;
+    await afterTicketChange(id);
+  }catch(e){
+    btn.disabled=false;btn.textContent='Submit';
+    errEl.textContent='Failed: '+e.message;errEl.classList.remove('hidden');
+  }
+}
+
+async function confirmTicketClosure(id){
+  if(!isTicketApprover()){alert('Only a manager or admin can close a ticket');return;}
+  if(!confirm('Confirm this ticket is resolved and close it?'))return;
+  const{error}=await sb.from('dgr_tickets').update({
+    status:'closed',closed_at:new Date().toISOString(),closed_by_name:session.name
+  }).eq('id',id);
+  if(error){alert('Close failed: '+error.message);return;}
+  await afterTicketChange(id);
+}
+
+async function reopenTicket(id){
+  if(!isTicketApprover()){alert('Only a manager or admin can reopen a ticket');return;}
+  const note=prompt('Why is this being reopened?');
+  if(note===null)return;
+  if(!note.trim()){alert('A reason is required');return;}
+  const{error}=await sb.from('dgr_tickets').update({
+    status:'approved',closure_requested_at:null,closure_requested_by_name:null,closure_note:null
+  }).eq('id',id);
+  if(error){alert('Reopen failed: '+error.message);return;}
+  await sb.from('dgr_ticket_comments').insert({
+    ticket_id:id,author_phone:session.phone,author_name:session.name,author_role:session.role,
+    comment:'Reopened: '+note.trim()
+  });
+  await afterTicketChange(id);
+}
+
+async function addTicketComment(id){
+  const inp=document.getElementById('ticketCommentInput');
+  const text=inp?inp.value.trim():'';
+  if(!text)return;
+  const{error}=await sb.from('dgr_ticket_comments').insert({
+    ticket_id:id,author_phone:session.phone,author_name:session.name,author_role:session.role,comment:text
+  });
+  if(error){alert('Comment failed: '+error.message);return;}
+  await viewTicket(id);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// REVIEW — Overview + History + Approvals folded into one tab for Manager and
+// above, so the bottom bar stays short. Engineers keep a plain History tab.
+// The Overview sub-tab appears automatically once a showOverview(el) exists.
+// ─────────────────────────────────────────────────────────────────────────────
+let reviewTab='history';
+function reviewSubtabs(){
+  const t=[];
+  if(typeof showOverview==='function')t.push({id:'overview',label:'Overview'});
+  t.push({id:'history',label:'History'});
+  t.push({id:'approvals',label:'Approvals'});
+  return t;
+}
+function showReview(){
+  const subs=reviewSubtabs();
+  if(!subs.some(t=>t.id===reviewTab))reviewTab=subs[0].id;
+  navTo('review/'+reviewTab);
+  const el=document.getElementById('screenReview');
+  el.classList.remove('hidden');
+  el.innerHTML=`
+    <div class="admin-tabs">
+      ${subs.map(t=>`<div class="admin-tab${reviewTab===t.id?' active':''}" onclick="reviewTab='${t.id}';showReview()">${t.label}</div>`).join('')}
+    </div>
+    <div id="reviewContent"></div>`;
+  const c=document.getElementById('reviewContent');
+  if(reviewTab==='overview')showOverview(c);
+  else if(reviewTab==='approvals')renderApprovals(c,true,'showReview');
+  else showHistory(c);
 }
 
 // ADMIN
@@ -2179,10 +2751,12 @@ function buildUserForm(u){
     <div class="modal-field"><label>Name</label><input id="mUserName" value="${u?u.name:''}"></div>
     <div class="modal-field"><label>Role</label>
       <select id="mUserRole">
-        <option value="engineer"${u&&u.role==='engineer'?' selected':''}>Engineer</option>
+        <option value="engineer"${u&&roleRank(u.role)<=1?' selected':''}>Site Engineer</option>
         <option value="manager"${u&&u.role==='manager'?' selected':''}>Manager</option>
-        <option value="admin"${u&&u.role==='admin'?' selected':''}>Admin</option>
+        <option value="admin"${u&&roleRank(u.role)===3?' selected':''}>Admin</option>
+        ${isDirector()?`<option value="director"${u&&u.role==='director'?' selected':''}>Director</option>`:''}
       </select>
+      ${isDirector()?'':'<div class="text-hint" style="margin-top:3px">Only a Director can grant the Director role.</div>'}
     </div>
     <div class="modal-field"><label>Assigned sites</label>
       <select id="mUserSites" multiple style="min-height:100px">${siteOpts}</select>
@@ -2428,13 +3002,43 @@ async function showAdminSettings(){
           </div>`).join('')}
       </div>
     </div>
+    <div class="card">
+      <div class="flex-between" style="margin-bottom:8px">
+        <div class="card-title" style="margin-bottom:0">Ticket categories</div>
+        <button class="btn btn-primary" style="padding:5px 10px;font-size:10px;width:auto" onclick="addSettingItem('ticket_categories')">+ Add</button>
+      </div>
+      <div id="settingsList_ticket_categories">
+        ${(appSettings.ticket_categories||[]).map((r,i)=>`
+          <div class="settings-item">
+            <span class="settings-item-text">${esc(r)}</span>
+            <span style="color:var(--red);cursor:pointer;font-size:10px" onclick="removeSettingItem('ticket_categories',${i})">Remove</span>
+          </div>`).join('')}
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Ticket approval threshold</div>
+      <label>Admin (L2) approval required above (₹)</label>
+      <input type="number" min="0" id="ticketThresholdInput" value="${ticketThreshold()}" ${isDirector()?'':'readonly class="readonly"'}>
+      <div class="text-hint" style="margin:4px 0 8px">Tickets estimated at or below this amount are fully approved by a manager. Above it, an Admin or Director must also approve.</div>
+      ${isDirector()
+        ? '<button class="btn btn-primary" style="padding:7px;font-size:11px" onclick="saveTicketThreshold()">Save threshold</button>'
+        : '<div class="text-hint">Only a Director can change this.</div>'}
+    </div>
     <div id="settingsSaveStatus" style="font-size:11px;color:var(--green);text-align:center;margin-top:4px"></div>
     ${buildSheetsSettingsPanel()}
     ${buildDownloadPanel()}
   `;
 }
+const SETTING_LABELS={grid_outage_reasons:'grid outage reasons',plant_fault_codes:'plant fault codes',ticket_categories:'ticket categories'};
+async function saveTicketThreshold(){
+  const raw=document.getElementById('ticketThresholdInput').value.trim();
+  const n=Number(raw);
+  if(raw===''||isNaN(n)||n<0){alert('Enter a valid amount');return;}
+  appSettings.ticket_l2_threshold=n;
+  await saveAppSetting('ticket_l2_threshold');
+}
 async function addSettingItem(settingKey){
-  const val=prompt(`Add new item to ${settingKey==='grid_outage_reasons'?'grid outage reasons':'plant fault codes'}:`);
+  const val=prompt(`Add new item to ${SETTING_LABELS[settingKey]||settingKey}:`);
   if(!val||!val.trim())return;
   if(!appSettings[settingKey])appSettings[settingKey]=[];
   appSettings[settingKey].push(val.trim());
@@ -2714,6 +3318,8 @@ async function viewSubmission(id){
 function closeModal(e){
   if(e&&e.target&&e.target!==document.getElementById('modalOverlay'))return;
   document.getElementById('modalOverlay').classList.add('hidden');
+  // drop the ticket id from the hash so back/refresh lands on the list
+  if((window.location.hash||'').startsWith('#tickets/'))navTo('tickets');
 }
 
 // ─────────────────────────────────────────
@@ -2806,7 +3412,7 @@ async function downloadDgrExcel(){
 
 function buildDownloadPanel(){
   const siteOpts='<option value="">All Sites</option>'+
-    (session.role==='engineer'
+    (isEngineer()
       ?(session.assigned_sites||[])
       :sites.map(s=>s.site_name)
     ).map?.(s=>`<option value="${s}">${s}</option>`).join('') ||
@@ -2988,6 +3594,38 @@ if('serviceWorker' in navigator){
   const blob=new Blob([swCode],{type:'application/javascript'});
   navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(()=>navigator.serviceWorker.register('/dgr_sw.js').catch(()=>{}));
 }
+
+// ── DEV ROLE PREVIEW ──────────────────────────────────────────────────────────
+// Only rendered when the URL carries ?dev=1. Changes session.role in memory for
+// this tab only -- nothing is written to the database or to localStorage.
+// Server-side data is unaffected; this previews the UI each role sees.
+const DEV_MODE=new URLSearchParams(location.search).get('dev')==='1';
+let _realRole=null;
+function buildDevBar(){
+  if(!DEV_MODE||!session)return;
+  if(_realRole===null)_realRole=session.role;
+  let el=document.getElementById('devBar');
+  if(!el){
+    el=document.createElement('div');
+    el.id='devBar';el.className='dev-bar';
+    document.body.appendChild(el);
+  }
+  const roles=['engineer','manager','admin','director'];
+  el.innerHTML='<b>Preview as</b>'+
+    roles.map(r=>`<button class="${session.role===r?'on':''}" onclick="devSetRole('${r}')">${ROLE_LABEL[r]}</button>`).join('')+
+    `<span class="real">actual: ${ROLE_LABEL[_realRole]||_realRole}</span>`;
+  // push the tab bar clear of the dev bar, whatever height it wraps to.
+  // Set synchronously -- rAF does not fire while the tab is backgrounded.
+  const tabs=document.getElementById('bottomTabs');
+  if(tabs)tabs.style.marginBottom=el.offsetHeight+'px';
+}
+function devSetRole(r){
+  session.role=r;
+  buildBottomTabs();
+  buildDevBar();
+  switchTab('dgr');
+}
+window.devSetRole=devSetRole;
 
 // INIT
 (function init(){
