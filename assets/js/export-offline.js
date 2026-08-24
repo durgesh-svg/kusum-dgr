@@ -139,7 +139,7 @@ async function downloadDgrExcel(){
 
 function buildDownloadPanel(){
   const siteOpts='<option value="">All Sites</option>'+
-    (session.role==='engineer'
+    (isEngineer()
       ?(session.assigned_sites||[])
       :sites.map(s=>s.site_name)
     ).map?.(s=>`<option value="${s}">${s}</option>`).join('') ||

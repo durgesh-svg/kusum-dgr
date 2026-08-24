@@ -18,15 +18,30 @@ let sites=[];
 let currentScreen=0;
 let currentTab='dgr';
 
+// ── ROLES ─────────────────────────────────────────────────────────────────────
+// director > admin > manager > engineer.
+// super_admin maps to admin and employee to engineer so accounts created by the
+// other app sharing this users table degrade sensibly instead of falling through
+// to the lowest tier (which is what happens today).
+const ROLE_RANK={engineer:1,employee:1,manager:2,admin:3,super_admin:3,director:4};
+const ROLE_LABEL={engineer:'Site Engineer',employee:'Site Engineer',manager:'Manager',
+                  admin:'Admin',super_admin:'Admin',director:'Director'};
+function roleRank(r){return ROLE_RANK[r]||1;}
+function isEngineer(){return roleRank(session&&session.role)<=1;}
+function isManagerUp(){return roleRank(session&&session.role)>=2;}
+function isAdminUp(){return roleRank(session&&session.role)>=3;}
+function isDirector(){return roleRank(session&&session.role)>=4;}
+
 // ── Hash-based routing ────────────────────────────────────────────────────────
 function navTo(hash){const t='#'+hash;if(window.location.hash!==t)history.pushState(null,'',t);}
 function handleHashNav(){
   const raw=(window.location.hash||'').replace('#','').trim();
   const [page,sub]=(raw||'dgr').split('/');
   if(page==='history')switchTab('history');
-  else if(page==='approvals'&&session&&(session.role==='admin'||session.role==='manager'))switchTab('approvals');
-  else if(page==='admin'&&session&&session.role==='admin'){if(sub)adminTab=sub;switchTab('admin');}
-  else if(page==='insights'&&session&&(session.role==='admin'||session.role==='manager'))switchTab('insights');
+  else if(page==='approvals'&&session&&isManagerUp())switchTab('approvals');
+  else if(page==='admin'&&session&&isAdminUp()){if(sub)adminTab=sub;switchTab('admin');}
+  else if(page==='insights'&&session&&isManagerUp())switchTab('insights');
+  else if(page==='overview'&&session&&isAdminUp())switchTab('overview');
   else switchTab('dgr');
 }
 window.addEventListener('popstate',()=>{if(session&&session.loggedIn)handleHashNav();});
@@ -34,7 +49,8 @@ let formData={};
 let photoFiles={};  // keyed by slot name
 let acknowledgements={inv_zero:false,pr_low:false,temp_high:false};
 let todaySubmissions={};
-let appSettings={grid_outage_reasons:[...DEFAULT_GRID_REASONS],plant_fault_codes:[...DEFAULT_FAULT_CODES]};
+let appSettings={grid_outage_reasons:[...DEFAULT_GRID_REASONS],plant_fault_codes:[...DEFAULT_FAULT_CODES],
+  ticket_l2_threshold:5000};
 let progressDate=new Date().toISOString().split('T')[0]; // selected date for home progress widget
 let show5Day=false; // 5-day panel toggle
 let insightsDays=30;
@@ -51,6 +67,7 @@ async function loadAppSettings(){
         const v=r.value;
         if(r.key==='grid_outage_reasons'&&v)appSettings.grid_outage_reasons=v;
         if(r.key==='plant_fault_codes'&&v)appSettings.plant_fault_codes=v;
+        if(r.key==='ticket_l2_threshold'&&v!=null)appSettings.ticket_l2_threshold=Number(v)||0;
         if(r.key==='sheets_script_url')sheetsSettings.script_url=typeof v==='string'?v:(v||'');
         if(r.key==='sheets_sheet_id')sheetsSettings.sheet_id=typeof v==='string'?v:'1agcGb0nTi1u-hEOlHU1eXt30wsWyEeK_';
         if(r.key==='sheets_tab_name')sheetsSettings.tab_name=typeof v==='string'?v:'Raw Data';
@@ -74,13 +91,13 @@ function buildBottomTabs(){
     {id:'dgr',label:'DGR',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>'},
     {id:'history',label:'History',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>'}
   ];
-  if(session.role==='manager'||session.role==='admin')
+  if(isManagerUp())
     tabs.push({id:'approvals',label:'Approvals',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>'});
-  if(session.role==='manager'||session.role==='admin')
+  if(isManagerUp())
     tabs.push({id:'insights',label:'Insights',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 16l4-4 4 4 4-8"/></svg>'});
-  if(session.role==='admin')
+  if(isAdminUp())
     tabs.push({id:'overview',label:'Overview',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>'});
-  if(session.role==='admin')
+  if(isAdminUp())
     tabs.push({id:'admin',label:'Admin',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197"/></svg>'});
   el.innerHTML=tabs.map(t=>`<div class="bottom-tab${t.id==='dgr'?' active':''}" data-tab="${t.id}" onclick="switchTab('${t.id}')">${t.icon}<span>${t.label}</span></div>`).join('');
   el.classList.remove('hidden');

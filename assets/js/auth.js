@@ -17,8 +17,9 @@ async function doLogin(){
   const hash=await hashPassword(pw);
   const{data,error}=await sb.from('users').select('*').eq('phone',phone).single();
   if(error||!data){errEl.textContent='User not found';errEl.classList.remove('hidden');return;}
-  if(data.password_hash!==hash){errEl.textContent='Incorrect password';errEl.classList.remove('hidden');return;}
-  session={phone:data.phone,name:data.name,role:data.role,assigned_sites:data.assigned_sites||[],loggedIn:true,userId:data.id,must_change_pw:data.must_change_pw};
+  if(data.active===false){errEl.textContent='This account has been deactivated. Contact your admin.';errEl.classList.remove('hidden');return;}
+  if(!data.password_hash||data.password_hash!==hash){errEl.textContent='Incorrect password';errEl.classList.remove('hidden');return;}
+  session={phone:data.phone,name:data.name,role:data.role,active:data.active!==false,assigned_sites:data.assigned_sites||[],loggedIn:true,userId:data.id,must_change_pw:data.must_change_pw};
   localStorage.setItem('dgr_session',JSON.stringify(session));
   if(session.must_change_pw){
     document.getElementById('loginScreen').classList.add('hidden');
@@ -68,6 +69,7 @@ async function enterApp(){
   document.getElementById('appWrap').classList.remove('hidden');
   await Promise.all([loadSites(),loadAppSettings()]);
   buildBottomTabs();
+  buildDevBar();
   handleHashNav();
   _startRealtime();
   _startPolling();
@@ -129,4 +131,52 @@ async function loadSites(){
   }catch(e){
     useCache();
   }
+}
+
+// ── DEV ROLE PREVIEW ──────────────────────────────────────────────────────────
+// Rendered only when the URL carries ?dev=1. Switches session.role in memory for
+// this tab; nothing is written to the database or localStorage, and one reload
+// restores the real role. It previews the UI a role sees -- it cannot preview
+// server-side enforcement, because authorization here is entirely client-side.
+const DEV_MODE=new URLSearchParams(location.search).get('dev')==='1';
+let _realRole=null;
+function buildDevBar(){
+  if(!DEV_MODE||!session)return;
+  if(_realRole===null)_realRole=session.role;
+  let el=document.getElementById('devBar');
+  if(!el){
+    el=document.createElement('div');
+    el.id='devBar';
+    el.style.cssText='position:fixed;left:0;right:0;bottom:0;z-index:300;background:#1e293b;'+
+      'color:#fff;display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:10px;'+
+      'padding:6px 10px calc(6px + env(safe-area-inset-bottom,0px))';
+    document.body.appendChild(el);
+  }
+  const btn='font:inherit;font-size:10px;font-weight:600;cursor:pointer;padding:4px 9px;border-radius:6px;';
+  el.innerHTML='<b style="color:#fbbf24;letter-spacing:.05em;font-size:9px">PREVIEW AS</b>'+
+    ['engineer','manager','admin','director'].map(r=>
+      `<button style="${btn}${session.role===r
+        ?'background:#fbbf24;color:#1e293b;border:1px solid #fbbf24'
+        :'background:#334155;color:#cbd5e1;border:1px solid #475569'}" `+
+      `onclick="devSetRole('${r}')">${ROLE_LABEL[r]}</button>`).join('')+
+    `<span style="margin-left:auto;opacity:.6;white-space:nowrap">actual: ${ROLE_LABEL[_realRole]||_realRole}</span>`;
+  _syncDevBarOffset();
+}
+// Lift the tab bar clear of the dev bar. Recomputed on resize because the bar
+// wraps to a second line on narrow screens, and measured synchronously because
+// rAF does not fire while the tab is backgrounded.
+function _syncDevBarOffset(){
+  const bar=document.getElementById('devBar');
+  const tabs=document.getElementById('bottomTabs');
+  if(bar&&tabs)tabs.style.marginBottom=bar.offsetHeight+'px';
+}
+if(DEV_MODE){
+  window.addEventListener('resize',_syncDevBarOffset);
+  window.addEventListener('orientationchange',_syncDevBarOffset);
+}
+function devSetRole(r){
+  session.role=r;
+  buildBottomTabs();
+  buildDevBar();
+  switchTab('dgr');
 }

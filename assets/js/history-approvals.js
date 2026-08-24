@@ -4,7 +4,7 @@ function showHistory(){
   el.classList.remove('hidden');
   // Build available site list for dropdown
   let siteOptions='<option value="">All sites</option>';
-  const siteList=session.role==='engineer'
+  const siteList=isEngineer()
     ?(session.assigned_sites||[])
     :sites.map(s=>s.site_name);
   siteList.forEach(s=>{siteOptions+=`<option value="${s}"${historyFilters.site===s?' selected':''}>${s}</option>`;});
@@ -25,7 +25,7 @@ function showHistory(){
       </div>
       <button class="btn btn-primary" style="width:100%;padding:8px;font-size:12px" onclick="loadHistory()">Search</button>
     </div>
-    ${(session.role==='manager'||session.role==='admin')?buildDownloadPanel():''}
+    ${isManagerUp()?buildDownloadPanel():''}
     <div id="historyResults"><div style="text-align:center;color:var(--gray);padding:20px">Press Search to load results</div></div>`;
   loadHistory();
 }
@@ -35,7 +35,7 @@ async function loadHistory(){
   el.innerHTML='<div style="text-align:center;color:var(--gray);padding:20px">Loading...</div>';
   try{
     let query=sb.from('dgr_submissions').select('*').order('report_date',{ascending:false}).limit(100);
-    if(session.role==='engineer')query=query.eq('submitted_by_phone',session.phone);
+    if(isEngineer())query=query.eq('submitted_by_phone',session.phone);
     if(historyFilters.site)query=query.eq('site_name',historyFilters.site);
     if(historyFilters.date)query=query.eq('report_date',historyFilters.date);
     const{data}=await query;

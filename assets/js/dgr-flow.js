@@ -17,7 +17,7 @@ async function showHomeScreen(){
   document.getElementById('navBar').classList.add('hidden');
   const el=document.getElementById('screen0');
   el.classList.remove('hidden');
-  const mySites=session.role==='engineer'?sites.filter(s=>session.assigned_sites.includes(s.site_name)):sites;
+  const mySites=isEngineer()?sites.filter(s=>(session.assigned_sites||[]).includes(s.site_name)):sites;
   const todayStr=new Date().toISOString().split('T')[0];
   const isToday=progressDate===todayStr;
   const dateLabel=isToday?'Today':new Date(progressDate+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'});
@@ -218,7 +218,7 @@ async function build5DayPanel(mySites){
   const base=new Date(progressDate+'T00:00:00');
   for(let i=0;i<5;i++){const d=new Date(base);d.setDate(base.getDate()-i);dates.push(d.toISOString().split('T')[0]);}
   let q=sb.from('dgr_submissions').select('site_name,status,report_date').in('report_date',dates);
-  if(session.role==='engineer')q=q.eq('submitted_by_phone',session.phone);
+  if(isEngineer())q=q.eq('submitted_by_phone',session.phone);
   let data=[];
   try{const r=await q;data=r.data||[];}catch(e){}
   const byDate={};
@@ -339,7 +339,7 @@ async function editSubmission(id){
   try{
     const{data,error}=await sb.from('dgr_submissions').select('*').eq('id',id).single();
     if(error||!data){alert('Could not load report to edit.');return;}
-    if(session.role==='engineer' && data.submitted_by_phone!==session.phone){
+    if(isEngineer() && data.submitted_by_phone!==session.phone){
       alert('You can only edit your own reports.');
       return;
     }
@@ -486,7 +486,7 @@ function goNext(){
 // SCREEN 1: SITE & DATE
 function buildScreen1(){
   const el=document.getElementById('screen1');
-  const mySites=session.role==='engineer'?sites.filter(s=>session.assigned_sites.includes(s.site_name)):sites;
+  const mySites=isEngineer()?sites.filter(s=>(session.assigned_sites||[]).includes(s.site_name)):sites;
 
   // ── Time restriction check (Feature 1) ────────────────────────────────────
   const todayStr=new Date().toISOString().split('T')[0];
@@ -1101,7 +1101,7 @@ function buildScreen6(){
   cycles.forEach(c=>{
     const state=cycleState(c.start,c.end);
     const curStatus=formData[c.statusKey]||'not-started';
-    const isLocked=state==='future'||(curStatus==='complete'&&session.role==='engineer');
+    const isLocked=state==='future'||(curStatus==='complete'&&isEngineer());
     let badgeCls='badge-gray';
     if(state==='active')badgeCls='badge-blue';
     if(curStatus==='complete')badgeCls='badge-green';

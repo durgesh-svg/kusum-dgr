@@ -204,7 +204,7 @@ async function showAdminUsers(){
           <tbody>
             ${(data||[]).map(u=>`<tr>
               <td>${u.phone || '—'}</td><td>${u.name || '—'}</td>
-              <td><span class="badge badge-${u.role==='admin'?'red':u.role==='manager'?'blue':'green'}">${u.role || 'user'}</span></td>
+              <td><span class="badge badge-${roleRank(u.role)>=4?'red':roleRank(u.role)===3?'red':u.role==='manager'?'blue':'green'}">${ROLE_LABEL[u.role]||u.role||'user'}</span></td>
               <td style="font-size:9px;max-width:80px;overflow:hidden;text-overflow:ellipsis">${(u.assigned_sites||[]).join(', ')}</td>
               <td style="white-space:nowrap">
                 <span style="color:var(--blue);cursor:pointer;font-size:10px" onclick="openUserModal('${u.id}')">Edit</span>
@@ -540,9 +540,10 @@ function buildUserForm(u){
     <div class="modal-field"><label>Name</label><input id="mUserName" value="${u?u.name:''}"></div>
     <div class="modal-field"><label>Role</label>
       <select id="mUserRole">
-        <option value="engineer"${u&&u.role==='engineer'?' selected':''}>Engineer</option>
+        <option value="engineer"${u&&roleRank(u.role)<=1?' selected':''}>Site Engineer</option>
         <option value="manager"${u&&u.role==='manager'?' selected':''}>Manager</option>
-        <option value="admin"${u&&u.role==='admin'?' selected':''}>Admin</option>
+        <option value="admin"${u&&roleRank(u.role)===3?' selected':''}>Admin</option>
+        ${isDirector()?`<option value="director"${u&&u.role==='director'?' selected':''}>Director</option>`:''}
       </select>
     </div>
     <div class="modal-field"><label>Assigned sites</label>
