@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dgr-v3';
+const CACHE_NAME = 'dgr-v4';
 const ASSETS = [
   '/dgr.html',
   '/dgr_manifest.json',
@@ -21,6 +21,8 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
+  // Supabase API traffic must never be cached — see the note in app-init.js.
+  if (e.request.url.indexOf('.supabase.co/') !== -1) return;
   e.respondWith(
     fetch(e.request)
       .then(res => {

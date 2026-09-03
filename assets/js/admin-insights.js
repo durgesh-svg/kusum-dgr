@@ -182,7 +182,8 @@ async function showAdminUsers(){
   const el=document.getElementById('adminContent');
   el.innerHTML='<div style="text-align:center;color:var(--gray);padding:10px">Loading...</div>';
   try{
-    const{data}=await sb.from('users').select('*').order('name');
+    const{data,error}=await sb.from('users').select('*').order('name');
+    if(error){el.innerHTML='<div class="error-box">Could not load users: '+error.message+'</div>';return;}
     // Sort: users with name/phone first, then nulls
     (data||[]).sort((a,b) => {
       const aVal = a.name || a.phone;
@@ -610,7 +611,8 @@ async function showAdminSites(){
   const el=document.getElementById('adminContent');
   el.innerHTML='<div style="text-align:center;color:var(--gray);padding:10px">Loading...</div>';
   try{
-    const{data}=await sb.from('site_config').select('*').order('site_name');
+    const{data,error}=await sb.from('site_config').select('*').order('site_name');
+    if(error){el.innerHTML='<div class="error-box">Could not load sites: '+error.message+'</div>';return;}
     el.innerHTML=`
       <div style="display:flex;gap:6px;margin-bottom:8px">
         <button class="btn btn-primary" style="flex:1;padding:8px;font-size:11px" onclick="openNewSiteModal()">+ Add Site</button>
@@ -837,7 +839,10 @@ async function runWeatherAudit(){
   if(!siteName||!date){resultEl.innerHTML='<div class="warning-box">Select site and date</div>';return;}
   resultEl.innerHTML='<div style="text-align:center;color:var(--gray);padding:10px">Loading...</div>';
   try{
-    const{data:sub}=await sb.from('dgr_submissions').select('*').eq('site_name',siteName).eq('report_date',date).single();
+    const{data:sub,error}=await sb.from('dgr_submissions').select('*').eq('site_name',siteName).eq('report_date',date).single();
+    // PGRST116 = no rows, which is the normal "not submitted" case; anything
+    // else is a real failure and must not be shown as "no submission".
+    if(error&&error.code!=='PGRST116'){resultEl.innerHTML='<div class="error-box">Lookup failed: '+error.message+'</div>';return;}
     if(!sub){resultEl.innerHTML='<div class="warning-box">No submission found</div>';return;}
     const wa=sub.weather_auto;
     if(!wa){resultEl.innerHTML='<div class="warning-box">No satellite data captured for this submission</div>';return;}

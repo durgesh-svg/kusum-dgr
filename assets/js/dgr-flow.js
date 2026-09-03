@@ -22,10 +22,16 @@ async function showHomeScreen(){
   const isToday=progressDate===todayStr;
   const dateLabel=isToday?'Today':new Date(progressDate+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'});
   try{
-    const{data}=await sb.from('dgr_submissions').select('id,site_name,status,submitted_by_name,created_at,review_note,reviewed_by,reviewed_at').eq('report_date',progressDate);
+    const{data,error}=await sb.from('dgr_submissions').select('id,site_name,status,submitted_by_name,created_at,review_note,reviewed_by,reviewed_at').eq('report_date',progressDate);
+    if(error)throw error;
     todaySubmissions={};
     if(data)data.forEach(d=>{todaySubmissions[d.site_name]=d;});
-  }catch(e){}
+  }catch(e){
+    // Do not leave this silent: an empty todaySubmissions makes every site look
+    // "not submitted", which is indistinguishable from a genuine backlog.
+    console.warn('[DGR] submissions load failed for',progressDate,e&&e.message);
+    if(typeof showToast==='function')showToast('Status load failed — list may be stale','error');
+  }
 
   // Fetch rejected submissions from last 7 days (Needs Attention)
   let rejectedItems=[];
@@ -34,15 +40,16 @@ async function showHomeScreen(){
     const sinceStr=since.toISOString().split('T')[0];
     const mySiteNames=mySites.map(s=>s.site_name);
     if(mySiteNames.length){
-      const{data:rj}=await sb.from('dgr_submissions')
+      const{data:rj,error:rjErr}=await sb.from('dgr_submissions')
         .select('id,site_name,report_date,review_note,reviewed_by,status')
         .eq('status','rejected')
         .in('site_name',mySiteNames)
         .gte('report_date',sinceStr)
         .order('report_date',{ascending:false});
+      if(rjErr)throw rjErr;
       rejectedItems=rj||[];
     }
-  }catch(e){}
+  }catch(e){console.warn('[DGR] rejected list load failed:',e&&e.message);}
 
   // Parse display note for each rejected item (review_note may be JSON)
   rejectedItems=rejectedItems.map(r=>{
@@ -55,9 +62,10 @@ async function showHomeScreen(){
   // Fetch active field visit for this engineer
   let activeVisit=null;
   try{
-    const{data:vd}=await sb.from('field_visits').select('*').eq('engineer_phone',session.phone).is('check_out_at',null).order('check_in_at',{ascending:false}).limit(1);
+    const{data:vd,error:vdErr}=await sb.from('field_visits').select('*').eq('engineer_phone',session.phone).is('check_out_at',null).order('check_in_at',{ascending:false}).limit(1);
+    if(vdErr)throw vdErr;
     if(vd&&vd.length>0)activeVisit=vd[0];
-  }catch(e){}
+  }catch(e){console.warn('[DGR] active visit load failed:',e&&e.message);}
 
   let approved=0,pending=0,notDone=0;
   mySites.forEach(s=>{
@@ -251,9 +259,31 @@ async function build5DayPanel(mySites){
 }
 
 // START DGR
+// Never guess an inverter count or capacity. A wrong count silently produces a
+// wrong DGR — that is exactly how the Sep-2026 site_config wipe stayed invisible
+// for two days: every affected site quietly fell back to 6 inverters and nobody
+// saw an error. Missing config must block the report, not be papered over.
+function getSiteInvCount(site){
+  const n=site?parseInt(site.inverter_count,10):NaN;
+  return Number.isFinite(n)&&n>0?n:null;
+}
+function missingSiteConfig(site){
+  if(!site)return['site not found in config'];
+  const miss=[];
+  if(!getSiteInvCount(site))miss.push('inverter count');
+  if(!(parseFloat(site.dc_capacity_kw)>0))miss.push('DC capacity');
+  return miss;
+}
+function warnSiteConfig(siteName,miss){
+  const msg=`${siteName}: ${miss.join(' & ')} missing in site config — contact admin`;
+  if(typeof showToast==='function')showToast(msg,'error');
+  else alert(msg);
+}
 function startDGR(siteName){
   const site=sites.find(s=>s.site_name===siteName);
-  const n=site?site.inverter_count||6:6;
+  const miss=missingSiteConfig(site);
+  if(miss.length){warnSiteConfig(siteName,miss);return;}
+  const n=getSiteInvCount(site);
   formData={
     site_name:siteName,
     report_date:new Date().toISOString().split('T')[0],
@@ -315,7 +345,13 @@ async function editSubmission(id){
     }
 
     const site=sites.find(s=>s.site_name===data.site_name);
-    const n=site?site.inverter_count||6:(Array.isArray(data.inv_gen)?data.inv_gen.length:6);
+    // Prefer live config; else reuse the report's own inverter count (real
+    // historical data). Never invent a number.
+    const n=getSiteInvCount(site)||(Array.isArray(data.inv_gen)&&data.inv_gen.length?data.inv_gen.length:0);
+    if(!n){
+      alert(`${data.site_name}: inverter count missing in site config and in this report. Ask admin to fix the site first.`);
+      return;
+    }
 
     formData={
       ...data,
@@ -514,9 +550,16 @@ function onSiteChange(v){
   formData.site_name=v;
   const site=sites.find(s=>s.site_name===v);
   if(site){
+    const miss=missingSiteConfig(site);
+    if(miss.length){
+      warnSiteConfig(v,miss);
+      formData.site_name='';
+      buildScreen1();
+      return;
+    }
     formData.dc_capacity_kw=site.dc_capacity_kw;
     formData.ac_capacity_kw=site.ac_capacity_kw;
-    const n=site.inverter_count||6;
+    const n=getSiteInvCount(site);
     formData.inverter_count=n;
     formData.strings_per_inv=site.strings_per_inv||[];
     formData.inv_gen=new Array(n).fill(0);
@@ -530,7 +573,14 @@ async function checkDuplicate(){
   const el=document.getElementById('s1Duplicate');
   if(!el||!formData.site_name||!formData.report_date){if(el)el.innerHTML='';return;}
   try{
-    const{data}=await sb.from('dgr_submissions').select('id,submitted_by_name,created_at').eq('site_name',formData.site_name).eq('report_date',formData.report_date).single();
+    const{data,error}=await sb.from('dgr_submissions').select('id,submitted_by_name,created_at').eq('site_name',formData.site_name).eq('report_date',formData.report_date).single();
+    // PGRST116 = no rows = no duplicate, the normal path. A real error must not
+    // be reported to the engineer as "no duplicate exists".
+    if(error&&error.code!=='PGRST116'){
+      console.warn('[DGR] duplicate check failed:',error.message);
+      el.innerHTML='<div class="warning-box">Could not check for an existing report — verify before submitting</div>';
+      return;
+    }
     if(data && (!formData.id || data.id!==formData.id)){
       const time=new Date(data.created_at).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
       el.innerHTML=`<div class="warning-box">Report already submitted at ${time} by ${data.submitted_by_name} — editing will overwrite</div>`;
@@ -653,7 +703,11 @@ function onStringCount(idx,val){
 // SCREEN 2: INVERTER GENERATION
 function buildScreen2(){
   const el=document.getElementById('screen2');
-  const n=formData.inverter_count||6;
+  const n=parseInt(formData.inverter_count,10);
+  if(!Number.isFinite(n)||n<=0){
+    el.innerHTML='<div class="error-box">Inverter count missing for this site — contact admin. Do not fill this report.</div>';
+    return;
+  }
   const strs=formData.strings_per_inv||[];
   if(!formData.inv_gen||formData.inv_gen.length!==n)formData.inv_gen=new Array(n).fill(0);
   if(!formData.inv_modules_cleaned||formData.inv_modules_cleaned.length!==n)

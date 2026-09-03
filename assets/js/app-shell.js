@@ -43,7 +43,8 @@ let _insightsCache=null;
 
 async function loadAppSettings(){
   try{
-    const{data}=await sb.from('dgr_settings').select('key,value');
+    const{data,error}=await sb.from('dgr_settings').select('key,value');
+    if(error)throw error;   // fall through to the localStorage fallback below
     if(data){
       data.forEach(r=>{
         // value is JSONB — parse it (strings come back as JS strings, arrays as arrays)

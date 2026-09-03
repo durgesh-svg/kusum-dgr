@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dgr-app",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["browser-sync", "start", "--server", ".", "--index", "dgr.html", "--port", "7929", "--no-open"],
+      "port": 7929
+    }
+  ]
+}

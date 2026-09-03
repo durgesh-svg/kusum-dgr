@@ -26,12 +26,18 @@ window.addEventListener('offline',()=>{document.getElementById('offlineBanner').
 // SERVICE WORKER
 if('serviceWorker' in navigator){
   const swCode=`
-    const CACHE='dgr-v7';
+    const CACHE='dgr-v9';
     const ASSETS=['/dgr_manifest.json'];
     self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)).then(()=>self.skipWaiting()));});
     self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));});
     self.addEventListener('fetch',e=>{
       if(e.request.method!=='GET')return;
+      // Never touch API traffic. This handler is cache-first, so a cached
+      // site_config or dgr_submissions response would be served forever and the
+      // app would show stale data with no way for the user to clear it.
+      // Offline reads are handled by localStorage (dgr_sites, dgr_app_settings)
+      // and the IndexedDB submit queue, not by this cache.
+      if(e.request.url.indexOf('.supabase.co/')!==-1)return;
       // Never cache HTML — always fetch fresh so auto-update works
       if(e.request.url.endsWith('.html')||e.request.url.endsWith('/')){
         e.respondWith(fetch(e.request).catch(()=>caches.match('/dgr.html')));
