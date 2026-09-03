@@ -102,19 +102,31 @@ function _onOnline(){
   _startRealtime();
   _refreshCurrentScreen();
 }
+// NOTE: loadSites must never WRITE to site_config.
+// It runs on every login for all 73 users. It used to seed DEFAULT_SITES with
+// null capacities whenever the read came back empty — and because supabase-js
+// returns {data:null,error} instead of throwing, a single failed request on any
+// one user's phone took that branch and wiped inverter_count / dc_capacity_kw /
+// ac_capacity_kw / strings_per_inv for all 35 seeded sites. Seeding is an admin
+// action (Admin > Sites), not something a login may do.
 async function loadSites(){
-  try{
-    const{data}=await sb.from('site_config').select('*').eq('active',true).order('site_name');
-    if(data&&data.length>0){sites=data;localStorage.setItem('dgr_sites',JSON.stringify(data));}
-    else{
-      const rows=DEFAULT_SITES.map(n=>({site_name:n,dc_capacity_kw:null,ac_capacity_kw:null,inverter_count:null,strings_per_inv:null,active:true}));
-      await sb.from('site_config').upsert(rows,{onConflict:'site_name'});
-      const{data:d2}=await sb.from('site_config').select('*').eq('active',true).order('site_name');
-      sites=d2||[];
-      localStorage.setItem('dgr_sites',JSON.stringify(sites));
-    }
-  }catch(e){
+  const useCache=()=>{
     const cached=localStorage.getItem('dgr_sites');
-    if(cached)sites=JSON.parse(cached);
+    if(!cached){sites=[];return;}
+    try{sites=JSON.parse(cached)||[];}catch(e){sites=[];}
+  };
+  try{
+    const{data,error}=await sb.from('site_config').select('*').eq('active',true).order('site_name');
+    if(error||!data||data.length===0){
+      // An empty or failed read is NOT proof the table is empty. Fall back to the
+      // last known good list; never overwrite server config from here.
+      console.warn('[DGR] site_config unavailable, using cached sites:',error?error.message:'empty result');
+      useCache();
+      return;
+    }
+    sites=data;
+    localStorage.setItem('dgr_sites',JSON.stringify(data));
+  }catch(e){
+    useCache();
   }
 }

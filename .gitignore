@@ -1,3 +1,7 @@
 .vercel
 
-.vercel
+# macOS
+.DS_Store
+
+# extracted into .claude/, which is committed
+.claude.zip
