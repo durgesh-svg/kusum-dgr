@@ -39,6 +39,7 @@ function handleHashNav(){
   const [page,sub]=(raw||'dgr').split('/');
   if(page==='history')switchTab('history');
   else if(page==='tickets'){switchTab('tickets');if(sub)setTimeout(()=>viewTicket(sub),0);}
+  else if(page==='cleaning')showCleaning();
   else if(page==='approvals'&&session&&isManagerUp())switchTab('approvals');
   else if(page==='admin'&&session&&isAdminUp()){if(sub)adminTab=sub;switchTab('admin');}
   else if(page==='insights'&&session&&isManagerUp())switchTab('insights');

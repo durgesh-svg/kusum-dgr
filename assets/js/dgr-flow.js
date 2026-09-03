@@ -76,6 +76,9 @@ async function showHomeScreen(){
     else notDone++;
   });
   const dateStr=new Date().toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
+  // Cleaning prompt sits beside the field-visit card; never blocks the screen
+  let cleaningCard='';
+  try{ cleaningCard=await buildCleaningCard(mySites.map(s=>s.site_name)); }catch(e){}
   const total=mySites.length||1;
   const reportedPct=Math.round(((approved+pending)/total)*100);
   const filteredSites=mySites.filter(s=>{
@@ -128,6 +131,7 @@ async function showHomeScreen(){
         <button onclick="showCheckInModal()" class="btn btn-secondary" style="padding:8px 14px;font-size:12px;white-space:nowrap">Check In</button>
       </div>`}
     </div>
+    ${cleaningCard}
     <div class="home-progress">
       <div class="home-progress-top">
         <div style="flex:1">
