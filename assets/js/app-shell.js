@@ -38,6 +38,7 @@ function handleHashNav(){
   const raw=(window.location.hash||'').replace('#','').trim();
   const [page,sub]=(raw||'dgr').split('/');
   if(page==='history')switchTab('history');
+  else if(page==='tickets'){switchTab('tickets');if(sub)setTimeout(()=>viewTicket(sub),0);}
   else if(page==='approvals'&&session&&isManagerUp())switchTab('approvals');
   else if(page==='admin'&&session&&isAdminUp()){if(sub)adminTab=sub;switchTab('admin');}
   else if(page==='insights'&&session&&isManagerUp())switchTab('insights');
@@ -68,6 +69,7 @@ async function loadAppSettings(){
         if(r.key==='grid_outage_reasons'&&v)appSettings.grid_outage_reasons=v;
         if(r.key==='plant_fault_codes'&&v)appSettings.plant_fault_codes=v;
         if(r.key==='ticket_l2_threshold'&&v!=null)appSettings.ticket_l2_threshold=Number(v)||0;
+        if(r.key==='ticket_categories'&&v)appSettings.ticket_categories=v;
         if(r.key==='sheets_script_url')sheetsSettings.script_url=typeof v==='string'?v:(v||'');
         if(r.key==='sheets_sheet_id')sheetsSettings.sheet_id=typeof v==='string'?v:'1agcGb0nTi1u-hEOlHU1eXt30wsWyEeK_';
         if(r.key==='sheets_tab_name')sheetsSettings.tab_name=typeof v==='string'?v:'Raw Data';
@@ -89,7 +91,8 @@ function buildBottomTabs(){
   const el=document.getElementById('bottomTabs');
   let tabs=[
     {id:'dgr',label:'DGR',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>'},
-    {id:'history',label:'History',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>'}
+    {id:'history',label:'History',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>'},
+    {id:'tickets',label:'Tickets',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9V7a2 2 0 012-2h12a2 2 0 012 2v2a2 2 0 000 4v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2a2 2 0 000-4z"/><path d="M13 5v14"/></svg>'}
   ];
   if(isManagerUp())
     tabs.push({id:'approvals',label:'Approvals',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>'});
@@ -116,6 +119,7 @@ function switchTab(tab){
   else if(tab==='admin')showAdmin();
   else if(tab==='insights')showInsights();
   else if(tab==='overview')showOverview();
+  else if(tab==='tickets')showTickets();
 }
 
 // ── TOAST NOTIFICATION ───────────────────────────────────────────────────────

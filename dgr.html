@@ -11,7 +11,7 @@
 <link rel="manifest" href="/dgr_manifest.json">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/dgr.css?v=16">
+<link rel="stylesheet" href="assets/css/dgr.css?v=17">
 </head>
 <body>
 <!-- SPLASH SCREEN -->
@@ -85,6 +85,7 @@
   <div id="screenAdmin" class="screen screen-padded hidden"></div>
   <div id="screenInsights" class="screen screen-padded hidden"></div>
   <div id="screenOverview" class="screen screen-padded hidden"></div>
+  <div id="screenTickets" class="screen screen-padded hidden"></div>
 </div>
 <input type="file" id="dgrHistCsvInput" accept=".csv" class="hidden" onchange="handleDgrHistCSV(event)">
 <div id="navBar" class="nav-bar hidden">
@@ -114,18 +115,20 @@
   <div class="modal-content" id="modalContent" onclick="event.stopPropagation()"></div>
 </div>
 <input type="file" id="photoInput" accept="image/*" class="hidden" onchange="handlePhoto(event)">
+<input type="file" id="ticketPhotoInput" accept="image/*" class="hidden" onchange="handleTicketPhoto(event)">
 <input type="file" id="csvInput" accept=".csv" class="hidden" onchange="handleCSV(event)">
 <input type="file" id="siteCsvInput" accept=".csv" class="hidden" onchange="handleSiteBulkCSV(event)">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.mini.min.js"></script>
-<script src="assets/js/app-shell.js?v=16"></script>
-<script src="assets/js/auth.js?v=16"></script>
-<script src="assets/js/dgr-flow.js?v=16"></script>
-<script src="assets/js/history-approvals.js?v=16"></script>
-<script src="assets/js/admin-insights.js?v=16"></script>
-<script src="assets/js/export-offline.js?v=16"></script>
-<script src="assets/js/overview.js?v=16"></script>
-<script src="assets/js/app-init.js?v=16"></script>
+<script src="assets/js/app-shell.js?v=17"></script>
+<script src="assets/js/auth.js?v=17"></script>
+<script src="assets/js/dgr-flow.js?v=17"></script>
+<script src="assets/js/history-approvals.js?v=17"></script>
+<script src="assets/js/admin-insights.js?v=17"></script>
+<script src="assets/js/export-offline.js?v=17"></script>
+<script src="assets/js/overview.js?v=17"></script>
+<script src="assets/js/tickets.js?v=17"></script>
+<script src="assets/js/app-init.js?v=17"></script>
 </body>
 </html>
