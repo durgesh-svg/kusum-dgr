@@ -513,33 +513,3 @@ async function addTicketComment(id){
   if(error){alert('Comment failed: '+error.message);return;}
   await viewTicket(id);
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// REVIEW — Overview + History + Approvals folded into one tab for Manager and
-// above, so the bottom bar stays short. Engineers keep a plain History tab.
-// The Overview sub-tab appears automatically once a showOverview(el) exists.
-// ─────────────────────────────────────────────────────────────────────────────
-let reviewTab='history';
-function reviewSubtabs(){
-  const t=[];
-  if(typeof showOverview==='function')t.push({id:'overview',label:'Overview'});
-  t.push({id:'history',label:'History'});
-  t.push({id:'approvals',label:'Approvals'});
-  return t;
-}
-function showReview(){
-  const subs=reviewSubtabs();
-  if(!subs.some(t=>t.id===reviewTab))reviewTab=subs[0].id;
-  navTo('review/'+reviewTab);
-  const el=document.getElementById('screenReview');
-  el.classList.remove('hidden');
-  el.innerHTML=`
-    <div class="admin-tabs">
-      ${subs.map(t=>`<div class="admin-tab${reviewTab===t.id?' active':''}" onclick="reviewTab='${t.id}';showReview()">${t.label}</div>`).join('')}
-    </div>
-    <div id="reviewContent"></div>`;
-  const c=document.getElementById('reviewContent');
-  if(reviewTab==='overview')showOverview(c);
-  else if(reviewTab==='approvals')renderApprovals(c,true,'showReview');
-  else showHistory(c);
-}
