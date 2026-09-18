@@ -232,6 +232,7 @@ async function showInsights(){
     _insightsCache={data:data||[],days:insightsDays,ts:now};
   }
   renderInsights(_insightsCache.data,insightsDays);
+  if(typeof fillGapSection==='function')fillGapSection();
 }
 async function loadInsightsData(days){
   const from=new Date();from.setDate(from.getDate()-days);
