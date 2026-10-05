@@ -42,7 +42,7 @@ All nine asset refs in `dgr.html` carry `?v=12`. **When you change any file unde
 
 This does **not** use Supabase Auth. `auth.js` SHA-256s the password in the browser, compares it against `users.password_hash` via an anon-key `select`, and stores the session in `localStorage`. The Supabase URL and anon key are hardcoded in `app-shell.js` — intentional for a static app; real enforcement has to live in RLS policies, not in JS.
 
-Roles are `engineer` | `manager` | `admin`. Role decides bottom tabs (`buildBottomTabs`), which sites are visible (engineers see only `session.assigned_sites`), and hash-route access. Engineers can only edit their own submissions.
+Roles are `engineer` | `manager` | `admin` | `director`, ranked in that order by `ROLE_RANK` in `app-shell.js` (`super_admin` is treated as admin, `employee` as engineer — both come from another app sharing the `users` table). Never compare `session.role` to a string; use `isEngineer()` / `isManagerUp()` / `isAdminUp()` / `isDirector()`. The role is cached in the `localStorage` session at login, so a role change in the database only applies after that user logs in again. Role decides bottom tabs (`buildBottomTabs`), which sites are visible (engineers see only `session.assigned_sites`), and hash-route access. Engineers can only edit their own submissions.
 
 ### The 10-screen wizard
 
