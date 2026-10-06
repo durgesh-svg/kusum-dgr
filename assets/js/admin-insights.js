@@ -1132,6 +1132,7 @@ async function viewSubmission(id){
     ${row('Today\'s activity',d.daily_activity||'—')}
     ${row('Remarks',d.remarks||'—')}
     ${((d.status==='rejected'||isReturned)&&d.review_note)?row('Rejection reason',`<span style="color:var(--red);font-weight:600">${escHtml(getDisplayNote(d.review_note)||String(d.review_note))}</span>`):''}
+    ${d.checkin_status?row('Site check-in',checkinBadge(d)):''}
     ${d.reviewed_by?row('Reviewed by',`<strong>${escHtml(d.reviewed_by)}</strong>`):''}
 
     ${d.status!=='approved'?`

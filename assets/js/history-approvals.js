@@ -90,6 +90,7 @@ async function renderApprovals(el,inAdmin){
           const flags=[];
           if((d.wti_c||0)>85||(d.oti_c||0)>85)flags.push('<span class="badge badge-red">High temp</span>');
           if((d.pr_pct||0)<70&&(d.pr_pct||0)>0)flags.push('<span class="badge badge-yellow">Low PR</span>');
+          if(typeof checkinBadge==='function'&&d.checkin_status&&d.checkin_status!=='verified')flags.push(checkinBadge(d));
           const isReturned=d.status==='rejected';
           const statusLabel=d.status;
           const approveF=inAdmin?'approveAndRefreshAdmin':'approveSubmission';

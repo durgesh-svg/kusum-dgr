@@ -59,13 +59,9 @@ async function showHomeScreen(){
     return{...r,_dn:dn||'Rejected'};
   });
 
-  // Fetch active field visit for this engineer
-  let activeVisit=null;
-  try{
-    const{data:vd,error:vdErr}=await sb.from('field_visits').select('*').eq('engineer_phone',session.phone).is('check_out_at',null).order('check_in_at',{ascending:false}).limit(1);
-    if(vdErr)throw vdErr;
-    if(vd&&vd.length>0)activeVisit=vd[0];
-  }catch(e){console.warn('[DGR] active visit load failed:',e&&e.message);}
+  // Site check-in comes from the expense portal (attendance.js); never blocks the screen
+  let attendanceCard='';
+  try{attendanceCard=await buildAttendanceCard();}catch(e){}
 
   let approved=0,pending=0,notDone=0;
   mySites.forEach(s=>{
@@ -112,25 +108,7 @@ async function showHomeScreen(){
         <button class="home-logout" onclick="logout()">Logout</button>
       </div>
     </div>
-    <!-- Field Visit Check In/Out -->
-    <div style="padding:0 14px;margin-bottom:0">
-      ${activeVisit ? `
-      <div style="background:#f0fdf4;border:1.5px solid var(--green-border);border-radius:10px;padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px">
-        <div>
-          <div style="font-size:10px;color:var(--green-dark);font-weight:700;text-transform:uppercase;letter-spacing:.05em">🟢 Checked In</div>
-          <div style="font-size:13px;font-weight:700;color:var(--text);margin-top:2px">${activeVisit.site_name}</div>
-          <div style="font-size:10px;color:var(--gray);margin-top:1px">Since ${new Date(activeVisit.check_in_at).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}</div>
-        </div>
-        <button onclick="doCheckOut('${activeVisit.id}')" class="btn btn-primary" style="padding:8px 14px;font-size:12px;white-space:nowrap">Check Out</button>
-      </div>` : `
-      <div style="background:#fff;border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px">
-        <div>
-          <div style="font-size:10px;color:var(--gray);font-weight:700;text-transform:uppercase;letter-spacing:.05em">📍 Field Visit</div>
-          <div style="font-size:12px;color:var(--text-muted);margin-top:2px">Arrived at a site? Check in</div>
-        </div>
-        <button onclick="showCheckInModal()" class="btn btn-secondary" style="padding:8px 14px;font-size:12px;white-space:nowrap">Check In</button>
-      </div>`}
-    </div>
+    ${attendanceCard}
     ${cleaningCard}
     <div class="home-progress">
       <div class="home-progress-top">
@@ -1386,6 +1364,9 @@ async function submitReport(){
       reviewed_at:null,
       review_note:null
     };
+    // Stamp the engineer's portal check-in for this site/date (attendance.js).
+    // Times out in 4s and never throws, so a slow portal cannot block a submission.
+    Object.assign(payload,await stampCheckin(payload.site_name,payload.report_date));
     // Remove undefined values
     Object.keys(payload).forEach(k=>{if(payload[k]===undefined)payload[k]=null;});
     // Save draft to localStorage before network call — protects against connection drops

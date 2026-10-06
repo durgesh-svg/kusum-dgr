@@ -19,7 +19,7 @@ async function doLogin(){
   if(error||!data){errEl.textContent='User not found';errEl.classList.remove('hidden');return;}
   if(data.active===false){errEl.textContent='This account has been deactivated. Contact your admin.';errEl.classList.remove('hidden');return;}
   if(!data.password_hash||data.password_hash!==hash){errEl.textContent='Incorrect password';errEl.classList.remove('hidden');return;}
-  session={phone:data.phone,name:data.name,role:data.role,active:data.active!==false,assigned_sites:data.assigned_sites||[],loggedIn:true,userId:data.id,must_change_pw:data.must_change_pw};
+  session={phone:data.phone,name:data.name,role:data.role,active:data.active!==false,attendance_phone:data.attendance_phone||null,assigned_sites:data.assigned_sites||[],loggedIn:true,userId:data.id,must_change_pw:data.must_change_pw};
   localStorage.setItem('dgr_session',JSON.stringify(session));
   if(session.must_change_pw){
     document.getElementById('loginScreen').classList.add('hidden');
