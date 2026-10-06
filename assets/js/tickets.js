@@ -66,8 +66,8 @@ function showTickets(){
   let siteOptions='<option value="">All sites</option>';
   ticketMySites().forEach(s=>{siteOptions+=`<option value="${esc(s)}"${ticketSiteFilter===s?' selected':''}>${esc(s)}</option>`;});
   const filters=isTicketApprover()
-    ?[['all','All'],['awaiting','Awaiting me'],['open','Open'],['approved','Approved'],['closed','Closed']]
-    :[['all','All'],['open','Open'],['approved','Approved'],['closed','Closed']];
+    ?[['all','All'],['alerts','Alerts'],['awaiting','Awaiting me'],['open','Open'],['approved','Approved'],['closed','Closed']]
+    :[['all','All'],['alerts','Alerts'],['open','Open'],['approved','Approved'],['closed','Closed']];
   el.innerHTML=`
     <div class="card-title">Tickets</div>
     <div class="card" style="padding:10px;margin-bottom:8px">
@@ -98,6 +98,7 @@ async function loadTickets(){
     else if(ticketFilter==='approved')q=q.in('status',['approved','closure_requested']);
     else if(ticketFilter==='closed')q=q.in('status',['closed','rejected','cancelled']);
     else if(ticketFilter==='awaiting')q=q.in('status',ticketAwaitingStatuses());
+    else if(ticketFilter==='alerts')q=q.eq('source','auto').in('status',['open','l1_approved','approved','closure_requested']);
     const{data,error}=await q;
     if(error)throw error;
     if(!data||data.length===0){el.innerHTML='<div class="card" style="text-align:center;color:var(--gray)">No tickets found</div>';return;}
@@ -106,7 +107,7 @@ async function loadTickets(){
         <div class="flex-between">
           <div style="min-width:0">
             <div class="history-site">${esc(ticketNo(t))} · ${esc(t.title)}</div>
-            <div class="history-date">${esc(t.site_name)} · ${esc(t.category)} · ${esc(t.raised_by_name||'')} · ${ticketAge(t)}</div>
+            <div class="history-date">${esc(t.site_name)} · ${esc(t.category)} · ${t.source==='auto'?'<span class="badge badge-red" style="font-size:9px;padding:1px 6px">AUTO</span>':esc(t.raised_by_name||'')} · ${ticketAge(t)}</div>
           </div>
           ${ticketStatusBadge(t.status)}
         </div>
@@ -298,6 +299,7 @@ function buildTicketDetail(t,comments){
     <div style="font-size:13px;font-weight:600;margin-bottom:2px">${esc(t.title)}</div>
     <div style="font-size:10px;color:var(--gray);margin-bottom:8px">${esc(t.site_name)} · raised by ${esc(t.raised_by_name||'—')} · ${ticketAge(t)}</div>
     ${head('Details')}
+    ${t.source==='auto'?row('Raised by',`<span class="badge badge-red">System</span> ${esc(t.rule_key||'')} · ${esc(t.alert_date||'')}`):''}
     ${row('Category',esc(t.category))}
     ${row('Priority',ticketPriorityBadge(t.priority))}
     ${row('Target date',esc(t.target_date?ticketDate(t.target_date):'—'))}
