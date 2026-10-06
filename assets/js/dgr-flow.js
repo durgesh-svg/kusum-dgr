@@ -1397,6 +1397,7 @@ async function submitReport(){
 // SCREEN 10: SUBMITTED
 function buildScreen10(){
   const el=document.getElementById('screen10');
+  setTimeout(loadSubmitAlerts,600);   // the database trigger has run by the time the upsert returned
   const dateStr=formData.report_date?new Date(formData.report_date+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}):'';
   const waMsg=buildWhatsAppMsg();
   el.innerHTML=`
@@ -1410,6 +1411,9 @@ function buildScreen10(){
         <div class="flex-between"><span>Saved to database</span><span style="color:var(--green-dark);font-weight:600">✓ Done</span></div>
         <div class="flex-between"><span>Manager approval</span><span style="color:var(--amber);font-weight:600">⏳ Pending</span></div>
       </div>
+    </div>
+    <div id="submitAlerts"></div>
+    <div style="display:none">
     </div>
     <div class="card">
       <div class="card-title">WhatsApp summary</div>
@@ -1528,4 +1532,23 @@ function getFieldNotes(raw){
   if(!raw)return{};
   try{const p=JSON.parse(raw);if(typeof p==='object'&&p!==null)return p;}catch(e){}
   return{general:raw};
+}
+
+
+// Alerts the database raised for the report just filed (trigger on dgr_submissions)
+async function loadSubmitAlerts(){
+  const host=document.getElementById('submitAlerts');
+  if(!host||!formData.site_name)return;
+  try{
+    const{data}=await sb.from('dgr_tickets').select('id,title,priority,rule_key')
+      .eq('source','auto').eq('site_name',formData.site_name).eq('alert_date',formData.report_date)
+      .in('status',['open','l1_approved']);
+    if(!data||!data.length)return;
+    host.innerHTML=`<div class="card" style="background:var(--red-light);border-color:var(--red-border)">
+      <div class="card-title" style="color:var(--red)">${data.length} alert${data.length===1?'':'s'} raised from this report</div>
+      ${data.map(t=>`<div style="font-size:11.5px;padding:4px 0;border-bottom:1px solid var(--red-border)">
+          <span class="badge ${t.priority==='critical'?'badge-red':'badge-yellow'}">${t.priority}</span> ${escHtml(t.title)}</div>`).join('')}
+      <button class="btn btn-secondary" style="margin-top:8px;padding:7px;font-size:11px" onclick="switchTab('tickets')">Open tickets</button>
+    </div>`;
+  }catch(e){}
 }

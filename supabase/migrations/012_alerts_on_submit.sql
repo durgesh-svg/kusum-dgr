@@ -1,0 +1,8 @@
+-- Applied 2026-10-07. Alerts fire when a report is saved (AFTER INSERT/UPDATE
+-- trigger on dgr_submissions -> eval_site_alerts), and when a cleaning log is
+-- rated poor (trigger on cleaning_logs). The nightly pg_cron job
+-- 'dgr-auto-tickets' now only raises: site_silent_2d, chronic_grid (Mondays),
+-- and a low_yield_3d catch-up for reports filed before 10 peers had.
+-- auto_raise_ticket() never comments twice for the same (rule, site, date), so
+-- editing a report is silent. Full function bodies are in the Supabase project;
+-- see migration history for 012_alerts_on_submit.

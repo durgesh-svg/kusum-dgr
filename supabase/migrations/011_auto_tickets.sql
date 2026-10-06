@@ -165,3 +165,7 @@ END $$;
 
 -- Nightly at 21:30 IST (16:00 UTC): the day's reports are in by then.
 SELECT cron.schedule('dgr-auto-tickets','0 16 * * *',$$SELECT run_auto_tickets(current_date - 1)$$);  -- APPLIED 2026-10-07
+
+-- SUPERSEDED in part by 012_alerts_on_submit.sql: per-site rules now run from a
+-- trigger at save time; the nightly job keeps site_silent_2d, chronic_grid and a
+-- low-yield catch-up.
