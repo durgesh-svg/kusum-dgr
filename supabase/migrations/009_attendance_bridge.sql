@@ -39,3 +39,12 @@ FROM (VALUES
 WHERE site_config.site_name = m.site_name;
 -- No portal location exists for: Devliya kallan, Dhirasar, Ghewariya, Godwanti Tal.
 -- Those stay NULL and report checkin_status = 'unmatched' until one is added.
+
+-- Applied 2026-10-06: engineers whose portal account uses a different number.
+-- Three confirmed by their check-ins landing at their own DGR site.
+UPDATE users SET attendance_phone = m.ap FROM (VALUES
+  ('8279095878','8209516671'),  -- Aasu singh  -> Aasu Singh
+  ('9649871912','9166664586'),  -- Karmendra   -> Karmendra Singh Rathore
+  ('9602741369','9672707592'),  -- Sandeep     -> Sandeep Luniwal (portal site Ramdevra-ii)
+  ('8769947915','8824794555')   -- Vijay Hada  -> Vijay Singh Hada
+) AS m(phone, ap) WHERE users.phone = m.phone;

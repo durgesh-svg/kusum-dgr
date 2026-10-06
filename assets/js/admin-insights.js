@@ -539,6 +539,9 @@ function buildUserForm(u){
     <div class="modal-header"><div class="modal-title">${u?'Edit User':'Add User'}</div><button class="modal-close" onclick="closeModal()">✕</button></div>
     <div class="modal-field"><label>Phone</label><input id="mUserPhone" value="${u?u.phone:''}" ${u?'readonly class="readonly"':''}></div>
     <div class="modal-field"><label>Name</label><input id="mUserName" value="${u?u.name:''}"></div>
+    <div class="modal-field"><label>Attendance phone</label>
+      <input id="mUserAttPhone" type="tel" value="${u&&u.attendance_phone?u.attendance_phone:''}" placeholder="Only if different in the expense portal">
+      <div class="text-hint" style="margin-top:2px">Number this person checks in with in the expense portal, if not the one above.</div></div>
     <div class="modal-field"><label>Role</label>
       <select id="mUserRole">
         <option value="engineer"${u&&roleRank(u.role)<=1?' selected':''}>Site Engineer</option>
@@ -560,20 +563,21 @@ async function saveUser(id){
   const phone=document.getElementById('mUserPhone').value.trim();
   const name=document.getElementById('mUserName').value.trim();
   const role=document.getElementById('mUserRole').value;
+  const attPhone=(document.getElementById('mUserAttPhone')||{value:''}).value.trim()||null;
   const siteSel=document.getElementById('mUserSites');
   const assignedSites=Array.from(siteSel.selectedOptions).map(o=>o.value);
   const errEl=document.getElementById('mUserError');
   errEl.classList.add('hidden');
   if(!phone||!name){errEl.textContent='Phone and name required';errEl.classList.remove('hidden');return;}
   if(id){
-    const{error}=await sb.from('users').update({name,role,assigned_sites:assignedSites}).eq('id',id);
+    const{error}=await sb.from('users').update({name,role,assigned_sites:assignedSites,attendance_phone:attPhone}).eq('id',id);
     if(error){errEl.textContent=error.message;errEl.classList.remove('hidden');return;}
   } else {
     const pwEl=document.getElementById('mUserPw');
     const pw=pwEl?pwEl.value:'';
     if(pw.length<8){errEl.textContent='Password min 8 chars';errEl.classList.remove('hidden');return;}
     const hash=await hashPassword(pw);
-    const{error}=await sb.from('users').insert({phone,name,role,assigned_sites:assignedSites,password_hash:hash,must_change_pw:true});
+    const{error}=await sb.from('users').insert({phone,name,role,assigned_sites:assignedSites,attendance_phone:attPhone,password_hash:hash,must_change_pw:true});
     if(error){errEl.textContent=error.message;errEl.classList.remove('hidden');return;}
   }
   closeModal();showAdminUsers();
