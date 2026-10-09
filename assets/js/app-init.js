@@ -26,7 +26,7 @@ window.addEventListener('offline',()=>{document.getElementById('offlineBanner').
 // SERVICE WORKER
 if('serviceWorker' in navigator){
   const swCode=`
-    const CACHE='dgr-v18';
+    const CACHE='dgr-v19';
     const ASSETS=['/dgr_manifest.json'];
     self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)).then(()=>self.skipWaiting()));});
     self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));});
@@ -39,7 +39,8 @@ if('serviceWorker' in navigator){
       // and the IndexedDB submit queue, not by this cache.
       if(e.request.url.indexOf('.supabase.co/')!==-1)return;
       // Never cache HTML — always fetch fresh so auto-update works
-      if(e.request.url.endsWith('.html')||e.request.url.endsWith('/')){
+      const path=new URL(e.request.url).pathname;
+      if(path.endsWith('.html')||path.endsWith('/')){   // pathname, so dashboard/index.html?embed counts
         e.respondWith(fetch(e.request).catch(()=>caches.match('/dgr.html')));
         return;
       }

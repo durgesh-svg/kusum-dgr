@@ -1,21 +1,13 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// PERFORMANCE GAP — splits each site's shortfall into grid-attributable and
-// unexplained, which is the difference between sending a technician and
-// sending an invoice.
+// GRID OUTAGE CLAIM — exports every recorded grid-outage window with an
+// estimate of the generation it cost, as a document for DISCOM claims.
 //
-// Why not PR: 17 sites have no pyranometer and 22 log physically impossible
-// irradiance, so PR ranks 2 honest measurements against 46 broken ones.
-// Specific yield (kWh/kWp) needs only generation and DC capacity, both
-// reliable for all 48 sites. Ranking each site against the FLEET MEDIAN for
-// the same day cancels weather without any sensor at all.
+// Lost generation is valued at the fleet-median specific yield (kWh/kWp) for
+// that day rather than PR: 17 sites have no pyranometer and 22 log impossible
+// irradiance, while generation and DC capacity are reliable everywhere.
 //
-// Grid attribution uses the outage windows already recorded in
-// grid_outage_details (populated on ~98% of outage-flagged reports and, until
-// now, never read). Expected production lost to an outage is pro-rated by the
-// share of the generating day it consumed.
-//
-// Renders into #screenInsights from showInsights(). Read-only: this module
-// never writes.
+// This file used to also render a performance-gap card into Insights; the
+// embedded dashboard's Generation Loss view replaced it. Read-only.
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Generating hours in a day, used to pro-rate outage minutes against expected
@@ -25,11 +17,6 @@ const GAP_SOLAR_HOURS = 10;
 const GAP_TARIFF = 3.0;          // Rs/kWh, for indicative annualised value only
 let gapDays = 60;
 let _gapRows = null;
-
-function gapFmt(n){return Math.round(n).toLocaleString('en-IN');}
-function gapLakh(kwhPerWindow,days){
-  return ((kwhPerWindow/days)*365*GAP_TARIFF/100000);
-}
 
 // Minutes lost from one report's outage windows. Mirrors calcOutageMins() in
 // export-offline.js; kept local so this module has no load-order dependency.
@@ -68,136 +55,11 @@ async function loadGapData(days){
   return all;
 }
 
-// Returns one row per site, ranked by unexplained kWh.
-function computeGap(rows){
-  const dcOf={};
-  sites.forEach(s=>{if(s.dc_capacity_kw>0)dcOf[s.site_name]=Number(s.dc_capacity_kw);});
-
-  // Specific yield per site-day, then the fleet median for each day.
-  const byDay={};
-  rows.forEach(r=>{
-    const dc=dcOf[r.site_name], gen=Number(r.total_gen_kwh)||0;
-    if(!dc||gen<=0)return;                      // zero-output days carry no signal
-    (byDay[r.report_date]=byDay[r.report_date]||[]).push({site:r.site_name,sy:gen/dc,gen,dc,row:r});
-  });
-
-  const out={};
-  Object.keys(byDay).forEach(date=>{
-    const day=byDay[date];
-    if(day.length<5)return;                     // too few reports to trust a median
-    const sorted=day.map(d=>d.sy).sort((a,b)=>a-b);
-    const med=sorted[Math.floor(sorted.length/2)];
-    day.forEach(d=>{
-      const s=out[d.site]||(out[d.site]={site:d.site,dc:d.dc,days:0,actual:0,expected:0,
-                                        outageMins:0,outageDays:0,explained:0,plantOutDays:0});
-      const expectedToday=med*d.dc;
-      s.days++; s.actual+=d.gen; s.expected+=expectedToday;
-      if(d.row.grid_outage){
-        const mins=gapOutageMins(d.row.grid_outage_details);
-        s.outageDays++; s.outageMins+=mins;
-        // Share of the generating day lost, capped at the whole day
-        s.explained+=expectedToday*Math.min(1,(mins/60)/GAP_SOLAR_HOURS);
-      }
-      if(d.row.plant_outage)s.plantOutDays++;
-    });
-  });
-
-  return Object.values(out).map(s=>{
-    const gap=s.expected-s.actual;
-    const explained=Math.min(Math.max(s.explained,0),Math.max(gap,0));
-    return {...s, gap, explained, unexplained:Math.max(gap-explained,0),
-            index: s.expected>0?Math.round(100*s.actual/s.expected):null,
-            outageHrs: s.outageMins/60};
-  }).sort((a,b)=>b.unexplained-a.unexplained);
-}
-
-// ── Render ───────────────────────────────────────────────────────────────────
-async function fillGapSection(){
-  const screen=document.getElementById('screenInsights');
-  if(!screen)return;
-  let host=document.getElementById('gapSection');
-  if(!host){
-    host=document.createElement('div');
-    host.id='gapSection';
-    screen.insertBefore(host,screen.firstChild);
-  }
-  host.innerHTML='<div class="card" style="text-align:center;color:var(--gray);padding:18px">Computing performance gap…</div>';
-  let g;
-  try{ _gapRows=await loadGapData(gapDays); g=computeGap(_gapRows); }
-  catch(e){ host.innerHTML='<div class="error-box">Could not compute performance gap</div>'; return; }
-  if(!g.length){ host.innerHTML=''; return; }
-
-  const totUnex=g.reduce((a,s)=>a+s.unexplained,0);
-  const totExpl=g.reduce((a,s)=>a+s.explained,0);
-  const plant=g.filter(s=>s.unexplained>0).slice(0,6);
-  const grid=[...g].sort((a,b)=>b.explained-a.explained).slice(0,5);
-
-  host.innerHTML=`
-    <div class="card-title">Performance gap — last ${gapDays} days</div>
-    <div class="filter-pills" style="margin-bottom:8px">
-      ${[30,60,90].map(d=>`<div class="filter-pill${gapDays===d?' active':''}" onclick="gapDays=${d};fillGapSection()">${d} days</div>`).join('')}
-    </div>
-
-    <div class="card">
-      <div style="display:flex;gap:10px">
-        <div style="flex:1">
-          <div style="font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted);font-weight:700">Needs a technician</div>
-          <div style="font-size:19px;font-weight:750;line-height:1.1;margin-top:2px">${gapFmt(totUnex)} <span style="font-size:11px;font-weight:500;color:var(--gray)">kWh</span></div>
-          <div style="font-size:10px;color:var(--gray)">~₹${gapLakh(totUnex,gapDays).toFixed(0)} lakh/yr</div>
-        </div>
-        <div style="width:1px;background:var(--border)"></div>
-        <div style="flex:1">
-          <div style="font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted);font-weight:700">Grid — claimable</div>
-          <div style="font-size:19px;font-weight:750;line-height:1.1;margin-top:2px">${gapFmt(totExpl)} <span style="font-size:11px;font-weight:500;color:var(--gray)">kWh</span></div>
-          <div style="font-size:10px;color:var(--gray)">~₹${gapLakh(totExpl,gapDays).toFixed(0)} lakh/yr</div>
-        </div>
-      </div>
-      <div class="text-hint" style="margin-top:7px">
-        Shortfall measured against the fleet median specific yield each day, so weather cancels.
-        Grid share is pro-rated from recorded outage windows at ~${GAP_SOLAR_HOURS} generating hours/day.
-        Indicative value at ₹${GAP_TARIFF}/kWh.
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">Unexplained shortfall — inspect these</div>
-      <div style="overflow-x:auto">
-        <table class="admin-table">
-          <thead><tr><th>Site</th><th>Index</th><th>Unexplained</th><th>Grid</th><th>Outage hrs</th></tr></thead>
-          <tbody>
-          ${plant.map(s=>`<tr>
-            <td style="white-space:nowrap">${escHtml(s.site)}</td>
-            <td><span class="badge ${s.index<85?'badge-red':s.index<100?'badge-yellow':'badge-green'}">${s.index}</span></td>
-            <td style="font-weight:700;white-space:nowrap">${gapFmt(s.unexplained)} kWh</td>
-            <td style="color:var(--gray);white-space:nowrap">${gapFmt(s.explained)}</td>
-            <td style="color:var(--gray)">${s.outageHrs.toFixed(0)}</td>
-          </tr>`).join('')}
-          </tbody>
-        </table>
-      </div>
-      <div class="text-hint" style="margin-top:5px">Index 100 = fleet median. These gaps are not explained by recorded outages.</div>
-    </div>
-
-    <div class="card">
-      <div class="flex-between" style="margin-bottom:6px">
-        <div class="card-title" style="margin-bottom:0">Grid losses — claim these</div>
-        <button class="btn btn-secondary" style="width:auto;padding:5px 10px;font-size:10px" onclick="downloadOutageReport()">Export</button>
-      </div>
-      <div style="overflow-x:auto">
-        <table class="admin-table">
-          <thead><tr><th>Site</th><th>Outage days</th><th>Hours</th><th>Est. lost</th></tr></thead>
-          <tbody>
-          ${grid.map(s=>`<tr>
-            <td style="white-space:nowrap">${escHtml(s.site)}</td>
-            <td>${s.outageDays}</td>
-            <td style="font-weight:700">${s.outageHrs.toFixed(0)}</td>
-            <td style="white-space:nowrap">${gapFmt(s.explained)} kWh</td>
-          </tr>`).join('')}
-          </tbody>
-        </table>
-      </div>
-      <div class="text-hint" style="margin-top:5px">Export gives every outage window with date, start, end and estimated kWh — a claim document.</div>
-    </div>`;
+// Called from the Insights toolbar. Loads the window first if nothing has.
+async function exportOutageReport(){
+  try{ if(!_gapRows)_gapRows=await loadGapData(gapDays); }
+  catch(e){ alert('Could not load outage data: '+(e.message||e)); return; }
+  downloadOutageReport();
 }
 
 // ── DISCOM claim export ──────────────────────────────────────────────────────

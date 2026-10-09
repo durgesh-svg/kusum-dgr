@@ -1,0 +1,507 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Stockwell DGR Dashboard</title>
+<style>
+  /* Layout: O&M control room. Sticky navy rail of views; each view leads with status and kWh lost, detail below. */
+  :root{
+    --navy:#0F2A4A; --navy2:#173E66; --navy-ink:#C9D5E3; --navy-mute:#7F97B2; --gold:#C08A1E;
+    --paper:#F2F4F7; --card:#FFFFFF; --ink:#18212C; --muted:#5D6977; --line:#E1E6EC; --accent:#0F2A4A; --series2:#C08A1E;
+    --good:#1D7F52; --good-bg:#E4F3EB; --warn:#946200; --warn-bg:#FBF0D6; --bad:#BF3B35; --bad-bg:#FBE6E4; --crit:#8E1F1A; --crit-bg:#F6D2CF;
+    --l-inv:#7B4FB8; --l-plant:#D9822B; --l-grid:#2F6DB5; --l-resid:#93A1AF;
+    --heat-0:#BF3B35; --heat-1:#E3A13B; --heat-2:#D3DEEA; --heat-3:#7FA3C8;
+    --font:"IBM Plex Sans","Segoe UI",Arial,sans-serif; --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+  }
+  @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+    --paper:#0E1116; --card:#171B22; --ink:#E8EBEF; --muted:#9AA4B1; --line:#29303A; --accent:#8FB3DC; --series2:#E0B55A;
+    --good:#5CC48F; --good-bg:#12321F; --warn:#E5B650; --warn-bg:#382B0C; --bad:#EE7A73; --bad-bg:#3A1816; --crit:#FFB0AA; --crit-bg:#5A1814;
+    --l-inv:#A88BE0; --l-plant:#F0A55A; --l-grid:#6FA3E0; --l-resid:#6F7E8D; --heat-2:#2B3A4C; --heat-3:#4F78A6; color-scheme:dark; } }
+  :root[data-theme="dark"]{
+    --paper:#0E1116; --card:#171B22; --ink:#E8EBEF; --muted:#9AA4B1; --line:#29303A; --accent:#8FB3DC; --series2:#E0B55A;
+    --good:#5CC48F; --good-bg:#12321F; --warn:#E5B650; --warn-bg:#382B0C; --bad:#EE7A73; --bad-bg:#3A1816; --crit:#FFB0AA; --crit-bg:#5A1814;
+    --l-inv:#A88BE0; --l-plant:#F0A55A; --l-grid:#6FA3E0; --l-resid:#6F7E8D; --heat-2:#2B3A4C; --heat-3:#4F78A6; color-scheme:dark; }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--font);font-size:14px;}
+  h1,h2,h3,h4{text-wrap:balance;}
+  .shell{display:flex;min-height:100vh;}
+  .side{width:220px;flex:none;background:var(--navy);color:#fff;padding:20px 12px;display:flex;flex-direction:column;gap:1px;position:sticky;top:0;height:100vh;overflow-y:auto;}
+  .brand{font-weight:700;font-size:16px;margin:0 0 2px 10px;} .brand span{color:var(--gold);}
+  .brand-sub{font-size:11px;color:var(--navy-mute);margin:0 0 14px 10px;}
+  .grp{font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--navy-mute);margin:14px 0 4px 10px;}
+  .side button{all:unset;display:flex;justify-content:space-between;align-items:center;gap:8px;color:var(--navy-ink);font-size:13.5px;padding:8px 10px;border-radius:6px;cursor:pointer;}
+  .side button:hover{background:var(--navy2);}
+  .side button[aria-current="page"]{background:var(--navy2);color:#fff;font-weight:600;box-shadow:inset 3px 0 0 var(--gold);}
+  .side button:focus-visible{outline:2px solid var(--gold);outline-offset:1px;}
+  .side .cnt{font-size:11px;font-weight:700;background:#BF3B35;color:#fff;border-radius:9px;padding:1px 7px;font-variant-numeric:tabular-nums;}
+  .side .cnt:empty{display:none;}
+  .main{flex:1;min-width:0;padding:18px 26px 64px;}
+  .topbar{display:flex;align-items:center;gap:10px 14px;flex-wrap:wrap;margin-bottom:14px;}
+  .topbar h1{font-size:20px;margin:0;}
+  .spacer{flex:1;}
+  .range{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);}
+  input[type=date],input[type=number],input[type=search],select,.btn{font-family:inherit;font-size:12.5px;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:7px;padding:7px 10px;}
+  input[type=number]{width:110px;}
+  .btn{cursor:pointer;font-weight:600;} .btn:hover{border-color:var(--muted);}
+  .btn.primary{background:var(--navy);border-color:var(--navy);color:#fff;} .btn.primary:hover{background:var(--navy2);}
+  .btn:disabled{opacity:.5;cursor:not-allowed;}
+  .btn:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--gold);outline-offset:1px;}
+  .chip{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;padding:4px 10px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--muted);white-space:nowrap;}
+  .chip::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor;}
+  .chip.sample{color:var(--warn);background:var(--warn-bg);border-color:transparent;}
+  .chip.saved{color:var(--good);background:var(--good-bg);border-color:transparent;}
+  .chip.local{color:var(--accent);}
+  .banner{border-radius:8px;padding:10px 14px;font-size:12.5px;line-height:1.5;margin-bottom:14px;background:var(--warn-bg);color:var(--ink);border:1px solid var(--line);}
+  .banner b{color:var(--warn);}
+  .banner button,.link{all:unset;color:var(--accent);font-weight:600;text-decoration:underline;cursor:pointer;}
+
+  .grid{display:grid;gap:14px;}
+  .kpis{grid-template-columns:repeat(6,minmax(0,1fr));}
+  .k5{grid-template-columns:repeat(5,minmax(0,1fr));}
+  .k4{grid-template-columns:repeat(4,minmax(0,1fr));}
+  .two{grid-template-columns:minmax(0,1fr) minmax(0,1fr);}
+  .wide-l{grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);align-items:start;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 18px;min-width:0;}
+  .mt{margin-top:14px;}
+  .kpi h4{margin:0 0 8px;font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;}
+  .kpi .num{font-size:21px;font-weight:700;color:var(--accent);font-variant-numeric:tabular-nums;line-height:1.15;}
+  .kpi .num small{font-size:12px;font-weight:600;color:var(--muted);}
+  .kpi .sub{font-size:11.5px;color:var(--muted);margin-top:5px;line-height:1.35;}
+  .kpi.alert{border-color:var(--bad);} .kpi.alert .num{color:var(--bad);}
+  .delta.up{color:var(--good);font-weight:700;} .delta.down{color:var(--bad);font-weight:700;}
+  .card h3{margin:0 0 4px;font-size:14.5px;}
+  .card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;}
+  .desc{font-size:12px;color:var(--muted);margin:0 0 12px;line-height:1.45;max-width:90ch;}
+  td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;}
+  .tw{overflow-x:auto;} .tw.tall{max-height:600px;overflow-y:auto;}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600;padding:7px 8px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--card);white-space:nowrap;z-index:1;}
+  td{padding:8px;border-bottom:1px solid var(--line);vertical-align:top;}
+  tr:last-child td{border-bottom:none;}
+  tr.click{cursor:pointer;} tr.click:hover td{background:var(--paper);}
+  .more td{color:var(--muted);text-align:center;font-size:12px;}
+  .clip{max-width:380px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .pill{font-size:10.5px;font-weight:700;padding:3px 8px;border-radius:10px;white-space:nowrap;display:inline-block;}
+  .pill.sev{text-transform:capitalize;}
+  .pill.g,.pill.green,.pill.low{background:var(--good-bg);color:var(--good);}
+  .pill.a,.pill.amber,.pill.medium{background:var(--warn-bg);color:var(--warn);}
+  .pill.r,.pill.red,.pill.high{background:var(--bad-bg);color:var(--bad);}
+  .pill.critical{background:var(--crit-bg);color:var(--crit);}
+  .pill.n{background:var(--paper);color:var(--muted);border:1px solid var(--line);}
+  .pill.low{background:var(--paper);color:var(--muted);border:1px solid var(--line);}
+  .bar{display:inline-block;vertical-align:middle;width:100px;height:8px;border-radius:4px;background:var(--line);overflow:hidden;margin-right:8px;}
+  .bar i{display:block;height:100%;background:var(--accent);} .bar.r i{background:var(--bad);}
+  .muted{color:var(--muted);}
+
+  /* status board */
+  .board{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;}
+  .tile{all:unset;box-sizing:border-box;cursor:pointer;background:var(--card);border:1px solid var(--line);border-left:5px solid var(--good);border-radius:8px;padding:9px 10px 8px;display:flex;flex-direction:column;gap:3px;min-width:0;}
+  .tile:hover{border-color:var(--muted);} .tile:focus-visible{outline:2px solid var(--gold);}
+  .tile.amber{border-left-color:var(--warn);} .tile.red{border-left-color:var(--bad);} .tile.none{border-left-color:var(--muted);background:var(--paper);}
+  .tile .nm{font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .tile .ix{font-size:19px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--ink);line-height:1.1;}
+  .tile .ix small{font-size:11px;color:var(--muted);font-weight:600;}
+  .tile .ft span{white-space:nowrap;}
+  .tile .ft{font-size:11px;color:var(--muted);display:flex;justify-content:space-between;gap:6px;font-variant-numeric:tabular-nums;}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--muted);margin-top:8px;align-items:center;}
+  .legend i{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-2px;margin-right:5px;}
+  .filterbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;}
+  .seg button{all:unset;cursor:pointer;font-size:12px;font-weight:600;padding:6px 10px;color:var(--muted);border-right:1px solid var(--line);}
+  .seg button:last-child{border-right:none;}
+  .seg button[aria-pressed="true"]{background:var(--navy);color:#fff;}
+  .seg button:focus-visible{outline:2px solid var(--gold);outline-offset:-2px;}
+
+  /* stacked bars (sites) */
+  .sbar{display:flex;height:12px;border-radius:3px;overflow:hidden;background:var(--line);min-width:60px;}
+  .sbar i{display:block;height:100%;}
+  .swatch-inv{background:var(--l-inv);} .swatch-plant{background:var(--l-plant);} .swatch-grid{background:var(--l-grid);} .swatch-resid{background:var(--l-resid);}
+
+  .chart{position:relative;}
+  .chart svg{display:block;width:100%;height:auto;overflow:visible;}
+  .chart .ax{fill:var(--muted);font-size:10.5px;font-family:var(--font);}
+  .chart .gl{stroke:var(--line);stroke-width:1;}
+  .chart .hov{stroke:var(--muted);stroke-width:1;stroke-dasharray:3 3;}
+  .tip{position:absolute;pointer-events:none;background:var(--ink);color:var(--card);font-size:11.5px;padding:6px 9px;border-radius:6px;white-space:nowrap;transform:translate(-50%,-100%);font-variant-numeric:tabular-nums;z-index:3;line-height:1.45;}
+
+  .wlist{display:flex;flex-direction:column;gap:9px;}
+  .wrow{display:flex;justify-content:space-between;gap:12px;font-size:13px;}
+  .wrow b{text-align:right;font-variant-numeric:tabular-nums;font-weight:600;}
+  .issue{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:4px 10px;align-items:start;padding:9px 0;border-bottom:1px solid var(--line);font-size:12.5px;}
+  .issue:last-child{border-bottom:none;}
+  .issue .t{font-weight:600;} .issue .d{color:var(--muted);grid-column:2 / 4;line-height:1.4;}
+  .issue .k{text-align:right;font-variant-numeric:tabular-nums;color:var(--muted);white-space:nowrap;}
+  .issue.click{cursor:pointer;} .issue.click:hover .t{text-decoration:underline;}
+
+  .ticket{border:1px solid var(--line);border-radius:8px;padding:11px 13px;}
+  .ticket .head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap;}
+  .ticket .site{font-weight:600;font-size:13.5px;} .ticket .row{font-size:12.5px;color:var(--muted);} .ticket .row b{color:var(--ink);}
+  .hm td.c{text-align:right;font-variant-numeric:tabular-nums;font-size:12px;white-space:nowrap;}
+  .hm td.c0{background:var(--bad-bg);color:var(--bad);font-weight:600;} .hm td.c1{background:var(--warn-bg);color:var(--warn);} .hm td.c2{} .hm td.c3{background:var(--good-bg);color:var(--good);}
+  .hm th{text-align:right;} .hm th:first-child{text-align:left;}
+  .eqm td.e{text-align:center;font-size:11.5px;font-weight:600;white-space:nowrap;cursor:pointer;min-width:84px;}
+  .eqm td.e.overdue{background:var(--bad-bg);color:var(--bad);} .eqm td.e.due{background:var(--warn-bg);color:var(--warn);} .eqm td.e.ok{background:var(--good-bg);color:var(--good);} .eqm td.e.none{color:var(--muted);}
+  .eqm td.e:hover{outline:2px solid var(--accent);outline-offset:-2px;}
+  .eqm th{white-space:normal;min-width:84px;text-align:center;}
+  .mr-sec{margin-top:14px;}
+  .bars .lbl{fill:var(--muted);font-size:10.5px;font-family:var(--font);}
+  .bars rect.b{cursor:pointer;} .bars rect.b:hover{opacity:.8;}
+  .heat{display:grid;gap:2px;font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums;}
+  .heat .c{height:16px;border-radius:2px;background:var(--line);}
+  .heat .c.h0{background:var(--heat-0);} .heat .c.h1{background:var(--heat-1);} .heat .c.h2{background:var(--heat-2);} .heat .c.h3{background:var(--heat-3);}
+  .heat .lab{line-height:16px;white-space:nowrap;padding-right:6px;text-align:right;}
+  .heat-legend{display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:var(--muted);margin-top:10px;}
+  .heat-legend span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px;background:var(--sw);}
+
+  .drop{border:2px dashed var(--line);border-radius:10px;padding:26px 18px;text-align:center;color:var(--muted);font-size:13px;}
+  .drop.over{border-color:var(--accent);background:var(--paper);}
+  .drop strong{color:var(--ink);display:block;font-size:14px;margin-bottom:6px;}
+  .actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px;}
+  .status{font-size:12.5px;color:var(--muted);} .status.err{color:var(--bad);} .status.ok{color:var(--good);}
+  .form{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px 16px;align-items:center;max-width:640px;font-size:13px;}
+  .form small{display:block;color:var(--muted);font-size:11.5px;margin-top:2px;}
+  code{font-family:var(--mono);font-size:12px;background:var(--paper);padding:1px 5px;border-radius:4px;}
+  dl.method{display:grid;grid-template-columns:minmax(120px,190px) minmax(0,1fr);gap:8px 16px;font-size:12.5px;margin:0;}
+  dl.method dt{font-weight:600;} dl.method dd{margin:0;color:var(--muted);line-height:1.45;}
+  footer{margin-top:26px;font-size:11.5px;color:var(--muted);line-height:1.5;max-width:110ch;}
+  .view[hidden]{display:none!important;}
+  body.simple .adv{display:none!important;}
+  body:not(.simple) .simple-only{display:none!important;}
+  body.simple .adv-only{display:none!important;}
+  .modebtn{all:unset;cursor:pointer;margin:18px 10px 0;padding:8px 10px;border:1px solid var(--navy-mute);border-radius:7px;color:var(--navy-ink);font-size:12.5px;text-align:center;}
+  .modebtn:hover{background:var(--navy2);} .modebtn:focus-visible{outline:2px solid var(--gold);}
+  body.simple .kpi .num{font-size:24px;}
+  body.simple .kpi h4{font-size:12px;text-transform:none;letter-spacing:0;color:var(--ink);}
+  .todo{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:4px 12px;align-items:start;padding:11px 0;border-bottom:1px solid var(--line);font-size:13.5px;cursor:pointer;}
+  .todo:last-child{border-bottom:none;} .todo:hover .tt{text-decoration:underline;}
+  .todo .no{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:700;color:#fff;background:var(--bad);}
+  .todo .no.m{background:var(--warn);}
+  .todo .tt{font-weight:600;} .todo .dd{grid-column:2/4;color:var(--muted);font-size:12.5px;line-height:1.4;} .todo .kk{color:var(--muted);font-size:12px;white-space:nowrap;text-align:right;}
+
+  body.embed .shell{flex-direction:column;}
+  body.embed .side{width:auto;height:auto;position:static;flex-direction:row;overflow-x:auto;align-items:center;padding:8px 16px;gap:4px;}
+  body.embed .brand,body.embed .brand-sub,body.embed .grp{display:none;}
+  body.embed .side button{white-space:nowrap;padding:8px 10px;}
+  body.embed .side button[aria-current="page"]{box-shadow:inset 0 -3px 0 var(--gold);}
+  body.embed .main{padding:16px 20px 48px;}
+  @media (max-width:1280px){ .kpis{grid-template-columns:repeat(3,minmax(0,1fr));} .k5{grid-template-columns:repeat(3,minmax(0,1fr));} .wide-l{grid-template-columns:minmax(0,1fr);} }
+  @media (max-width:820px){
+    .shell{flex-direction:column;}
+    .side{width:auto;height:auto;position:static;flex-direction:row;overflow-x:auto;align-items:center;padding:10px 16px;gap:4px;}
+    .brand{margin:0 10px 0 0;white-space:nowrap;} .brand-sub,.grp{display:none;}
+    .side button{white-space:nowrap;padding:8px 10px;}
+    .side button[aria-current="page"]{box-shadow:inset 0 -3px 0 var(--gold);}
+    .main{padding:16px 16px 48px;}
+    .kpis,.k5,.k4{grid-template-columns:repeat(2,minmax(0,1fr));}
+    .two{grid-template-columns:minmax(0,1fr);}
+    .board{grid-template-columns:repeat(auto-fill,minmax(130px,1fr));}
+    .form{grid-template-columns:minmax(0,1fr);}
+    dl.method{grid-template-columns:minmax(0,1fr);}
+  }
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600;700&family=IBM+Plex+Mono:wght@400&display=swap">
+
+<div class="shell">
+  <nav class="side" aria-label="Dashboard views">
+    <div class="brand">Stockwell <span>O&amp;M</span></div>
+    <div class="brand-sub">PM KUSUM · DGR Control Room</div>
+    <div class="grp adv">Monitor</div>
+    <button data-view="cc" data-sl="Home" aria-current="page"><span>Command Centre</span></button>
+    <button class="adv" data-view="issues"><span>Issues</span><span class="cnt" id="navIssues"></span></button>
+    <button class="adv" data-view="loss"><span>Generation Loss</span></button>
+    <button data-view="targets" data-sl="Money"><span>Targets &amp; Revenue</span></button>
+    <button class="adv" data-view="overview"><span>Portfolio Overview</span></button>
+    <div class="grp adv">Sites</div>
+    <button data-view="site" data-sl="Plants"><span>Site Details</span></button>
+    <button data-view="inverters" data-sl="Inverters"><span>Inverters</span></button>
+    <button class="adv" data-view="temp"><span>Temperature</span></button>
+    <button class="adv" data-view="history"><span>Monthly History</span></button>
+    <button class="adv" data-view="ranking"><span>Site Ranking</span></button>
+    <div class="grp adv">Maintenance</div>
+    <button data-view="equip" data-sl="Maintenance"><span>Equipment Schedule</span><span class="cnt" id="navEquip"></span></button>
+    <button data-view="mreport" data-sl="Monthly Report"><span>Maintenance Report</span></button>
+    <button class="adv" data-view="trafo"><span>Transformers</span></button>
+    <button class="adv" data-view="pm"><span>Activity Summary</span></button>
+    <div class="grp adv">Data</div>
+    <button class="adv" data-view="discipline"><span>DGR Discipline</span></button>
+    <button class="adv" data-view="meter"><span>Meter vs DGR</span></button>
+    <button data-view="data" data-sl="Upload DGR"><span>Load DGR Data</span></button>
+    <button data-view="settings" data-sl="Settings"><span>Settings</span></button>
+    <button id="modeBtn" class="modebtn" type="button"><span id="modeTxt">Show all screens</span></button>
+  </nav>
+
+  <main class="main">
+    <div class="topbar">
+      <h1 id="pageTitle">Command Centre</h1>
+      <span id="srcChip" class="chip">Loading…</span>
+      <div class="spacer"></div>
+      <div class="range">
+        <label for="dFrom" class="adv">From</label><input type="date" id="dFrom" class="adv">
+        <label for="dTo" class="adv">to</label><input type="date" id="dTo" class="adv">
+        <select id="skinSel" class="adv" aria-label="Theme" title="Theme"></select>
+        <span class="simple-only muted" id="periodTxt" style="font-size:12.5px"></span><select id="dPreset" aria-label="Quick range">
+          <option value="">Quick range…</option>
+          <option value="month">Latest month</option>
+          <option value="7">Last 7 days</option>
+          <option value="30">Last 30 days</option>
+          <option value="365">Last 12 months</option>
+          <option value="all">All data</option>
+        </select>
+      </div>
+    </div>
+    <div id="banner"></div>
+
+    <!-- COMMAND CENTRE -->
+    <section class="view" id="v-cc">
+      <div class="hero" id="ccHero" aria-label="Portfolio banner"><b>Stockwell O&amp;M · PM KUSUM portfolio</b><span id="heroSub">Rajasthan solar plants</span></div>
+      <div class="grid kpis" id="ccKpis"></div>
+      <div class="card mt">
+        <div class="card-head"><div><h3 id="boardTitle">Site status, latest DGR</h3><p class="desc" id="boardDesc"></p></div>
+          <div class="seg" role="group" aria-label="Sort sites"><button data-sort="status" aria-pressed="true">By status</button><button data-sort="name" aria-pressed="false">A–Z</button><button data-sort="loss" aria-pressed="false">By loss</button></div></div>
+        <div class="board" id="board"></div>
+        <div class="legend" id="boardLegend"><span><i style="background:var(--bad)"></i>Critical or high issue</span><span><i style="background:var(--warn)"></i>Medium issue</span><span><i style="background:var(--good)"></i>No open issue above low</span><span><i style="background:var(--muted)"></i>No DGR</span><span>Big number = latest day's DC CUF vs nearby sites</span></div>
+      </div>
+      <div class="grid wide-l mt">
+        <div class="card"><div class="card-head"><h3><span class="adv-only">Needs attention now</span><span class="simple-only">What to fix first</span></h3><button class="link adv" data-go="issues">All issues</button></div><div id="ccIssues"></div></div>
+        <div class="grid" style="gap:14px">
+          <div class="card"><h3>Portfolio generation</h3><p class="desc">Daily total kWh across all reporting sites.</p><div class="chart" id="chGen"></div></div>
+          <div class="card adv"><h3>Estimated daily loss by cause</h3><p class="desc">kWh below each site's benchmark, split by cause.</p><div class="chart" id="chLossDaily"></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PORTFOLIO OVERVIEW (classic) -->
+    <section class="view" id="v-overview" hidden>
+      <div class="grid kpis" id="ovKpis"></div>
+      <div class="grid two mt">
+        <div class="card"><h3>Generation</h3><p class="desc">Daily total across all sites, kWh.</p><div class="chart" id="ovGen"></div></div>
+        <div class="card"><h3>Ambient and module temperature</h3><p class="desc">Daily average °C over sites that logged a reading. Module temperature appears once the DGR has that column.</p><div class="chart" id="ovLoss"></div></div>
+        <div class="card"><h3>Transformer WTI / OTI</h3><p class="desc">Daily average °C over sites that logged a reading.</p><div class="chart" id="ovTemp"></div></div>
+        <div class="card"><h3>Grid outage</h3><p class="desc">Total grid outage minutes per day, all sites.</p><div class="chart" id="ovGrid"></div></div>
+      </div>
+      <div class="grid two mt">
+        <div class="card"><h3>Highest WTI / OTI on the latest day</h3><p class="desc" id="ovWtiDesc"></p><div class="tw"><table id="ovWti"></table></div></div>
+        <div class="card"><h3>Grid outage by reason</h3><p class="desc">Trips counted from the Grid Outage Reasons column across the selected range.</p><div class="tw"><table id="ovReasons"></table></div></div>
+      </div>
+    </section>
+
+    <!-- MAINTENANCE & ACTIVITY -->
+    <section class="view" id="v-pm" hidden>
+      <div class="card"><h3>Maintenance signals</h3><p class="desc">Counts of what the DGR columns contain. There is no separate PM schedule in the DGR.</p><div class="tw"><table id="tPm"></table></div></div>
+      <div class="grid two mt">
+        <div class="card"><h3>Activities and remarks</h3><p class="desc">DGR rows whose Daily Activity or Remarks mention each item.</p><div class="tw"><table id="tKw"></table></div></div>
+        <div class="card"><h3>Problems reported in remarks</h3><p class="desc">Sites whose Remarks mention each problem type in the selected range.</p><div class="tw"><table id="tRemCats"></table></div></div>
+      </div>
+    </section>
+
+    <!-- ISSUES -->
+    <section class="view" id="v-issues" hidden>
+      <div class="card">
+        <div class="filterbar">
+          <div class="seg" role="group" aria-label="Severity" id="sevSeg"></div>
+          <select id="fCat" aria-label="Category"></select>
+          <select id="fSite" aria-label="Site"></select>
+          <input type="search" id="fText" placeholder="Search issues" aria-label="Search issues">
+          <span class="spacer"></span>
+          <button class="btn" id="btnIssuesCsv">Download CSV</button><span class="status" id="issuesMsg"></span>
+        </div>
+        <p class="desc" id="issuesDesc"></p>
+        <div class="tw tall"><table id="tIssues"></table></div>
+      </div>
+      <div class="card mt"><h3>How issues are raised</h3><p class="desc">Issues are raised automatically from the DGR every time data changes: inverter output per kWp, site yield against the portfolio, outage minutes and fault codes, transformer readings, silica gel and MOG, submission gaps, and recurring problems written in Remarks (for example "VCB annunciator faulty", "grass cutting required", "SCADA not working"). An issue stays open while the DGR keeps showing it. "Since" is the first day of the current run, or the first remark in the selected range.</p></div>
+    </section>
+
+    <!-- LOSS -->
+    <section class="view" id="v-loss" hidden>
+      <div class="grid k5" id="lossKpis"></div>
+      <div class="card mt"><h3>Daily loss by cause</h3><p class="desc">Estimated kWh lost each day, all sites.</p><div class="chart" id="chLoss2"></div>
+        <div class="legend"><span><i class="swatch-inv"></i>Inverter</span><span><i class="swatch-plant"></i>Plant outage</span><span><i class="swatch-grid"></i>Grid outage</span><span><i class="swatch-resid"></i>Unexplained (soiling, shading, strings…)</span></div></div>
+      <div class="card mt"><div class="card-head"><div><h3>Loss by site</h3><p class="desc">Sorted by estimated kWh lost. Click a site to open Site 360.</p></div><button class="btn" id="btnLossCsv">Download CSV</button></div><span class="status" id="lossMsg"></span>
+        <div class="tw tall"><table id="tLoss"></table></div></div>
+      <div class="card mt"><h3>How loss is estimated</h3><dl class="method" id="method"></dl></div>
+    </section>
+
+    <!-- TARGETS -->
+    <section class="view" id="v-targets" hidden>
+      <div class="grid k5" id="tgKpis"></div>
+      <div class="card mt"><div class="card-head"><div><h3>Revenue by site</h3><p class="desc" id="revDesc"></p></div><button class="btn" id="btnRevCsv">Download CSV</button></div><span class="status" id="revMsg"></span>
+        <div class="tw tall"><table id="tRev2"></table></div></div>
+      <div class="card mt adv"><div class="card-head"><div><h3>Sites against PVsyst target</h3><p class="desc" id="tgDesc"></p></div><button class="btn" id="btnTgCsv">Download CSV</button></div><span class="status" id="tgMsg"></span>
+        <div class="tw tall"><table id="tTg"></table></div></div>
+      <div class="grid two mt adv">
+        <div class="card"><h3>Month by month, sites with a target</h3><p class="desc">Actual DC CUF against target DC CUF.</p><div class="tw"><table id="tTgMon"></table></div></div>
+        <div class="card"><h3>Sites without a usable target</h3><p class="desc">Send the PVsyst annual DC CUF for these sites to switch their targets on.</p><div id="tgMissing"></div></div>
+      </div>
+    </section>
+
+    <!-- HISTORY -->
+    <section class="view" id="v-history" hidden>
+      <div class="card">
+        <div class="card-head"><div><h3>DC CUF by month</h3><p class="desc" id="hiDesc"></p></div>
+          <div class="seg" role="group" aria-label="Colour cells by" id="hiSeg"><button data-hc="bench" aria-pressed="true">vs nearby sites</button><button data-hc="target" aria-pressed="false">vs target</button></div></div>
+        <div class="tw tall"><table id="tHist"></table></div>
+        <div class="legend" id="hiLegend"></div>
+      </div>
+      <div class="card mt"><h3>Portfolio DC CUF by month</h3><p class="desc">All sites, generation ÷ (DC kWp × 24 h × days reported).</p><div class="tw"><table id="tHistPort"></table></div></div>
+    </section>
+
+    <!-- SITE 360 -->
+    <section class="view" id="v-site" hidden>
+      <div class="card" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+        <label for="siteSel" style="font-weight:600;">Site</label>
+        <select id="siteSel" style="min-width:0;max-width:100%;width:280px;"></select>
+        <span id="siteStatus"></span>
+        <span class="muted" id="siteMeta" style="font-size:12.5px;"></span>
+      </div>
+      <div class="grid kpis mt" id="siteKpis"></div>
+      <div class="grid wide-l mt">
+        <div class="card adv"><h3>DC CUF against benchmark</h3><p class="desc" id="benchDesc"></p><div class="chart" id="chSite"></div></div>
+        <div class="card"><h3>Open issues</h3><div id="siteIssues"></div></div>
+      </div>
+      <div class="card mt"><h3>Generation and DC CUF</h3><p class="desc">Daily generation in kWh (navy) with DC CUF % (gold, right scale).</p><div class="chart" id="chSiteGen"></div></div>
+      <div class="grid two mt">
+        <div class="card adv"><h3>Where the loss comes from</h3><div id="siteLoss"></div></div>
+        <div class="card"><h3>Transformer and checks</h3><div class="wlist" id="siteChecks"></div></div>
+      </div>
+      <div class="card mt adv"><h3>Inverters, kWh per kWp against site reference</h3><p class="desc" id="heatDesc"></p><div class="tw" id="heat"></div>
+        <div class="heat-legend"><span style="--sw:var(--heat-0)">below 70%</span><span style="--sw:var(--heat-1)">70–90%</span><span style="--sw:var(--heat-2)">90–105%</span><span style="--sw:var(--heat-3)">above 105%</span><span style="--sw:var(--line)">no value</span></div></div>
+      <div class="card mt"><h3>Daily log</h3><div class="tw tall"><table id="tDaily"></table></div></div>
+    </section>
+
+    <!-- INVERTERS -->
+    <section class="view" id="v-inverters" hidden>
+      <div class="card" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+        <label for="invSite" style="font-weight:600;">Site</label>
+        <select id="invSite" style="min-width:0;max-width:100%;width:280px;"></select>
+        <span class="muted" id="invMeta" style="font-size:12.5px;"></span>
+      </div>
+      <div class="grid two mt">
+        <div class="card"><h3>Generation by inverter</h3><p class="desc">Total kWh in the selected dates.</p><div class="chart" id="chInvGen"></div></div>
+        <div class="card"><h3>DC CUF by inverter</h3><p class="desc">kWh ÷ (inverter DC kW × 24 h × days). The dashed line is the site's DC CUF.</p><div class="chart" id="chInvCuf"></div></div>
+      </div>
+      <div class="card mt"><h3>Loss by inverter</h3><p class="desc">kWh lost against the site's best-performing middle (median kWh per kWp). <b>Click a bar or a row</b> to see that inverter day by day.</p><div class="chart" id="chInvLoss"></div><div class="tw mt"><table id="tInvSite"></table></div></div>
+      <div class="card mt" id="invDrill" hidden>
+        <div class="card-head"><div><h3 id="invDrillTitle"></h3><p class="desc" id="invDrillDesc"></p></div><button class="btn" id="invDrillClose">Close</button></div>
+        <div class="grid k4" id="invDrillKpis"></div>
+        <div class="mt"><div class="chart" id="chInvDay"></div><div class="legend"><span><i style="background:var(--accent)"></i>Generated kWh</span><span><i style="background:var(--bad)"></i>Lost kWh</span></div></div>
+        <div class="tw tall mt"><table id="tInvDay"></table></div>
+      </div>
+      <div class="card mt adv">
+        <div class="card-head"><div><h3>All sites: inverters below 95%</h3><p class="desc">Each inverter's kWh per kWp of its own DC capacity, against the median of its site's inverters that day.</p></div>
+          <div class="seg" role="group" aria-label="Inverter filter" id="invSeg"><button data-f="issue" aria-pressed="true">Below 95%</button><button data-f="all" aria-pressed="false">All inverters</button></div></div>
+        <div class="tw tall"><table id="tInv"></table></div>
+      </div>
+      <div class="card mt adv"><h3>Single-day drops that recovered</h3><p class="desc" id="dipDesc"></p><div class="grid two" id="dips" style="gap:10px"></div></div>
+    </section>
+
+    <!-- TEMPERATURE -->
+    <section class="view" id="v-temp" hidden>
+      <div class="grid k4" id="tpKpis"></div>
+      <div class="card mt"><h3>Ambient and module temperature</h3><p class="desc">Daily average over the sites that logged a reading.</p><div class="chart" id="chTp"></div></div>
+      <div class="card mt"><h3>By site</h3><p class="desc" id="tpDesc"></p><div class="tw tall"><table id="tTp"></table></div></div>
+    </section>
+
+    <!-- EQUIPMENT SCHEDULE -->
+    <section class="view" id="v-equip" hidden>
+      <div class="grid k4" id="eqKpis"></div>
+      <div class="card mt">
+        <div class="card-head"><div><h3>Preventive maintenance schedule</h3><p class="desc" id="eqDesc"></p></div>
+          <div class="filterbar" style="margin:0"><select id="eqStatus" aria-label="Status"><option value="">All statuses</option><option value="overdue">Overdue</option><option value="due">Due in 7 days</option><option value="none">No record</option><option value="ok">Up to date</option></select><button class="btn" id="btnEqCsv">Download CSV</button></div></div>
+        <span class="status" id="eqMsg"></span>
+        <div class="tw tall"><table id="tEq" class="eqm"></table></div>
+        <div class="legend"><span><i style="background:var(--bad-bg)"></i>Overdue</span><span><i style="background:var(--warn-bg)"></i>Due within 7 days</span><span><i style="background:var(--good-bg)"></i>Up to date (days left shown)</span><span><i style="background:var(--paper);border:1px solid var(--line)"></i>No record yet</span><span>Click a cell to see history or mark work done</span></div>
+      </div>
+      <div class="card mt" id="eqPanel" hidden></div>
+      <div class="card mt adv"><h3>Frequency and checklist</h3><p class="desc">How often each item is due, in days. Change a number and press Save.</p><div class="tw"><table id="tEqFreq"></table></div><div class="actions"><button class="btn primary" id="btnEqFreq">Save frequencies</button><span class="status" id="eqFreqMsg"></span></div></div>
+    </section>
+
+    <!-- MAINTENANCE REPORT -->
+    <section class="view" id="v-mreport" hidden>
+      <div class="card" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+        <label for="mrSite" style="font-weight:600;">Site</label><select id="mrSite" style="min-width:0;max-width:100%;width:260px;"></select>
+        <label for="mrMonth" style="font-weight:600;">Month</label><select id="mrMonth"></select>
+        <span class="spacer"></span><button class="btn" id="btnMrCsv">Download report (CSV)</button><span class="status" id="mrMsg"></span>
+      </div>
+      <div id="mrBody"></div>
+    </section>
+
+    <!-- RANKING -->
+    <section class="view" id="v-ranking" hidden>
+      <div class="card">
+        <div class="card-head"><div><h3>Sites ranked by performance, weakest first</h3><p class="desc">Performance = site DC CUF ÷ DC CUF of nearby sites on the same days. 100% = same as neighbours. Click a site to open it.</p></div><button class="btn" id="btnRankCsv">Download CSV</button></div><span class="status" id="rankMsg"></span>
+        <div class="tw tall"><table id="tRank"></table></div>
+      </div>
+    </section>
+
+    <!-- TRANSFORMERS -->
+    <section class="view" id="v-trafo" hidden>
+      <div class="grid two">
+        <div class="card"><h3>Average WTI / OTI</h3><p class="desc">Daily average °C over sites with a reading.</p><div class="chart" id="chTemp"></div></div>
+        <div class="card"><h3>Watch levels</h3><p class="desc" id="trafoDesc"></p><div class="wlist" id="trafoSummary"></div></div>
+      </div>
+      <div class="card mt"><h3>Every transformer, latest DGR</h3><div class="tw tall"><table id="tTrafo"></table></div></div>
+    </section>
+
+    <!-- DISCIPLINE -->
+    <section class="view" id="v-discipline" hidden>
+      <div class="grid k4" id="discKpis"></div>
+      <div class="grid two mt">
+        <div class="card" style="grid-column:1/-1"><h3>Fields left blank, latest day</h3><p class="desc" id="blankDesc"></p><div class="tw"><table id="tBlank"></table></div></div>
+        <div class="card"><h3>Not submitted on the latest day</h3><p class="desc" id="nsDesc"></p><div class="wlist" id="notSub"></div></div>
+        <div class="card"><h3>Approvals</h3><p class="desc">DGRs approved in the range, by reviewer.</p><div class="tw"><table id="tRev"></table></div></div>
+      </div>
+      <div class="card mt"><h3>By site</h3><p class="desc">Submission time is hours after the start of the report day (21.0 = 9 pm the same day). Late = submitted after midnight.</p><div class="tw tall"><table id="tDisc"></table></div></div>
+    </section>
+
+    <!-- METER -->
+    <section class="view" id="v-meter" hidden>
+      <div class="card">
+        <div class="card-head"><div><h3>Meter reading against DGR generation</h3><p class="desc" id="mtDesc"></p></div><select id="mtMonth" aria-label="Month"></select></div>
+        <div class="tw tall"><table id="tMeter"></table></div>
+      </div>
+      <div class="card mt"><h3>Portfolio by month</h3><p class="desc">Meter actual generation and net export from the monthly sheet, against the sum of daily DGR generation for the same sites.</p><div class="tw"><table id="tMeterMon"></table></div></div>
+    </section>
+
+    <!-- DATA -->
+    <section class="view" id="v-data" hidden>
+      <div class="card"><h3>Current data</h3><div class="wlist" id="dataNow" style="margin-top:10px;"></div></div>
+      <div class="card mt">
+        <h3>Load a DGR export</h3>
+        <p class="desc">Excel (.xlsx, .xls), CSV or JSON from the DGR app. Exports over 1,000 rows are cut off by the app, so export long periods in parts (for example 1–15 and 16–30) and load each one. The file is read in your browser.</p>
+        <div class="drop" id="drop"><strong>Drop the DGR file here</strong>or <label class="btn" for="fileIn" style="display:inline-block;margin-top:6px;">Choose file</label><input type="file" id="fileIn" accept=".xlsx,.xls,.csv,.json" hidden></div>
+        <div id="parseOut"></div>
+        <div class="actions"><button class="btn" id="btnTemplate">Download blank DGR template</button><span class="status" id="tplMsg"></span></div>
+      </div>
+    </section>
+
+    <!-- SETTINGS -->
+    <section class="view" id="v-settings" hidden>
+      <div class="card"><h3>Appearance</h3><p class="desc">Pick a colour theme and a background. Data stays on solid cards so it is always readable.</p><div id="appearance"></div></div>
+      <div class="card mt">
+        <h3>Settings</h3>
+        <p class="desc">Saved in this browser only. Each person can set their own.</p>
+        <form class="form" id="setForm">
+          <label for="sTariff">Tariff, ₹ per kWh<small>Shows loss in rupees. Leave blank to show kWh only.</small></label><input type="number" id="sTariff" step="0.01" min="0" placeholder="e.g. 3.14">
+          <label for="sGenHours">Generating hours per day<small>Used to convert outage minutes into kWh.</small></label><input type="number" id="sGenHours" step="0.5" min="6" max="13">
+          <label for="sInvLow">Inverter "low" below, % of site reference</label><input type="number" id="sInvLow" step="1" min="30" max="95">
+          <label for="sGapHigh">Site yield "high" issue below, % of portfolio median (7 days)</label><input type="number" id="sGapHigh" step="1" min="50" max="99">
+          <label for="sGapMed">Site yield "medium" issue below, %</label><input type="number" id="sGapMed" step="1" min="50" max="100">
+          <label for="sWti">WTI watch level, °C</label><input type="number" id="sWti" step="1" min="40" max="120">
+          <label for="sOti">OTI watch level, °C</label><input type="number" id="sOti" step="1" min="40" max="120">
+          <label for="sGrid">Grid outage minutes in 7 days to raise an issue</label><input type="number" id="sGrid" step="30" min="60">
+          <div class="actions" style="grid-column:1/-1;margin:4px 0 0"><button class="btn primary" type="submit">Apply</button><button class="btn" type="button" id="btnReset">Restore defaults</button><span class="status" id="setMsg"></span></div>
+        </form>
+      </div>
+      <div class="card mt">
+        <h3>Connecting the DGR app</h3>
+        <p class="desc">Inside the DGR app, open this page as <code>dashboard/index.html?embed</code> in the Insights tab and send rows with <code>postMessage({type:'dgr-rows', rows})</code>, or set <code>window.DGR_CONFIG = { apiUrl: "/api/dgr" }</code>. See README.md in the package.</p>
+      </div>
+    </section>
+
+    <footer class="simple-only">Numbers come from the daily DGRs. "Compared with nearby plants" means the same-day generation per kWp of plants close by, so weather is taken out. Use "Show all screens" for the detailed analysis.</footer>
+    <footer class="adv">All figures come from approved DGR rows and the monthly CUF workbooks. Performance is measured as DC CUF against nearby sites on the same day, and against PVsyst targets where received. Loss figures are estimates; the method is on Generation Loss.</footer>
+  </main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<!-- dgr-config.js checks the DGR app login, wires live data, then loads engine/ops/app/theme in order -->
+<script src="dgr-config.js?v=1"></script>
+
+</body></html>

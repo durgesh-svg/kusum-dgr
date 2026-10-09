@@ -56,9 +56,6 @@ let appSettings={grid_outage_reasons:[...DEFAULT_GRID_REASONS],plant_fault_codes
   ticket_l2_threshold:5000};
 let progressDate=new Date().toISOString().split('T')[0]; // selected date for home progress widget
 let show5Day=false; // 5-day panel toggle
-let insightsDays=30;
-let insightsSort='pr';
-let _insightsCache=null;
 
 async function loadAppSettings(){
   try{

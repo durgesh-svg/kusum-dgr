@@ -91,6 +91,17 @@ Freshness comes from both a Realtime `postgres_changes` subscription on `dgr_sub
 - **`sync-to-sheets`** — pulls `status='approved' AND synced_to_sheet=false`, flattens each row to a fixed ~155-column layout (18 scalars + six 20-wide inverter blocks + outage/transformer/weather tail), POSTs to a Google Apps Script web app URL stored in `dgr_settings.sheets_script_url`, then marks rows synced. Triggered manually from Admin → Settings, optionally by pg_cron every 30 min. Column order is load-bearing for the destination sheet.
 - **`fetch-suryalog`** — polls the Suryalog SCADA API for a 5-minute window across all sites, archives raw JSON to Storage, parses into `scada_*` tables. Needs `SURYALOG_SECRET` and `SURYALOG_SITES` (JSON array of `{site_name, plant_key}`) as function secrets.
 
+## Insights dashboard (`dashboard/`)
+
+The Insights tab (managers and up) is an iframe of `dashboard/index.html?embed`, the Stockwell DGR Dashboard: its own HTML/JS (`engine.js` pure metrics, `ops.js` loss/issues, `app.js` UI, `theme.js`), outside the `assets/` versioning. Treat `engine.js`/`ops.js`/`app.js`/`theme.js`/`index.html` as vendored — the only DGR-specific file is `dashboard/dgr-config.js`, which:
+
+- gates on the `dgr_session` in localStorage (same origin; client-side only, like the rest of the app),
+- feeds `DGR_CONFIG.loadRows`: `data/history.json` (CUF-workbook rows the database lacks, `_src:'cuf'`) merged with every non-rejected `dgr_submissions` row, live wins; managers are filtered to `assigned_sites`,
+- holds back trailing days until 80% of the usual site count has filed, because the dashboard reads its latest date as a complete day,
+- then loads the dashboard scripts in order.
+
+`master.json` (site lat/lng, peers, tariff, PVsyst, meter readings) and the Gajroopdesar -1/-2 `rename` come from the dashboard package. When any dashboard file changes, bump `VER` in `dgr-config.js` and the `?v=` on its script tag in `dashboard/index.html`.
+
 ## Standalone pages
 
 `monitor.html` (SCADA live dashboard, dark theme, reads `scada_*` directly) and `appraisal.html` (self-contained annual appraisal page) are independent of the DGR app — separate HTML, own inline CSS/JS, not part of the `assets/` bundle or its versioning.
