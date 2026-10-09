@@ -96,11 +96,11 @@ Freshness comes from both a Realtime `postgres_changes` subscription on `dgr_sub
 The Insights tab (managers and up) is an iframe of `dashboard/index.html?embed`, the Stockwell DGR Dashboard: its own HTML/JS (`engine.js` pure metrics, `ops.js` loss/issues, `app.js` UI, `theme.js`), outside the `assets/` versioning. Treat `engine.js`/`ops.js`/`app.js`/`theme.js`/`index.html` as vendored — the only DGR-specific file is `dashboard/dgr-config.js`, which:
 
 - gates on the `dgr_session` in localStorage (same origin; client-side only, like the rest of the app),
-- feeds `DGR_CONFIG.loadRows`: `data/history.json` (CUF-workbook rows the database lacks, `_src:'cuf'`) merged with every non-rejected `dgr_submissions` row, live wins; managers are filtered to `assigned_sites`,
+- feeds `DGR_CONFIG.loadRows` entirely from Supabase — no static data files: `dgr_submissions` (non-rejected) merged with `dgr_history` (CUF-workbook generation for site-days with no DGR, `_src:'cuf'`), plus a site master built from `site_config` (capacity, lat/lng, district, tariff, PVsyst, tilt, `peer_sites`, `colocated_sites`), `site_meter_monthly`, and `dgr_settings` keys `insights_seasonal` / `insights_rename`. Every manager sees every site,
 - holds back trailing days until 80% of the usual site count has filed, because the dashboard reads its latest date as a complete day,
 - then loads the dashboard scripts in order.
 
-`master.json` (site lat/lng, peers, tariff, PVsyst, meter readings) and the Gajroopdesar -1/-2 `rename` come from the dashboard package. When any dashboard file changes, bump `VER` in `dgr-config.js` and the `?v=` on its script tag in `dashboard/index.html`.
+`insights_rename` swaps Gajroopdesar -1/-2 for display only (the budget sheet names them opposite to the DGR app, where "-1" is the 4 MW plant); set its `map` to `{}` to show DGR names. A new site needs `peer_sites` in `site_config` to get a "vs nearby plants" benchmark. When any dashboard file changes, bump `VER` in `dgr-config.js`, the `?v=` on its script tag in `dashboard/index.html`, and the `&v=` on the iframe src in `admin-insights.js`.
 
 ## Standalone pages
 

@@ -236,7 +236,7 @@ function showInsights(){
       <a href="dashboard/index.html" target="_blank" rel="noopener">Full screen ↗</a>
     </div>
     <iframe id="insightsFrame" class="insights-frame" data-user="${escHtml(String(session.userId))}"
-      src="dashboard/index.html?embed&v=1" title="Insights dashboard"></iframe>`;
+      src="dashboard/index.html?embed&v=2" title="Insights dashboard"></iframe>`;
 }
 // ── END INSIGHTS ──────────────────────────────────────────────────────────────
 
