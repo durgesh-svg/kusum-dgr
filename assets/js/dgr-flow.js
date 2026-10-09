@@ -62,6 +62,11 @@ async function showHomeScreen(){
   // Site check-in comes from the expense portal (attendance.js); never blocks the screen
   let attendanceCard='';
   try{attendanceCard=await buildAttendanceCard();}catch(e){}
+  // Engineers: report-a-problem button and their open tickets. Managers and up:
+  // the counts that need them. Both live in tickets.js; neither blocks the screen.
+  let jobsCard='',summaryCard='';
+  try{jobsCard=typeof buildEngineerJobsCard==='function'?await buildEngineerJobsCard():'';}catch(e){}
+  try{summaryCard=typeof buildManagerSummary==='function'?await buildManagerSummary():'';}catch(e){}
 
   let approved=0,pending=0,notDone=0;
   mySites.forEach(s=>{
@@ -72,9 +77,9 @@ async function showHomeScreen(){
     else notDone++;
   });
   const dateStr=new Date().toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
-  // Cleaning prompt sits beside the field-visit card; never blocks the screen
+  // Cleaning prompt is an engineer's job; managers reach the summary from their cards
   let cleaningCard='';
-  try{ cleaningCard=await buildCleaningCard(mySites.map(s=>s.site_name)); }catch(e){}
+  if(isEngineer()){try{ cleaningCard=await buildCleaningCard(mySites.map(s=>s.site_name)); }catch(e){}}
   const total=mySites.length||1;
   const reportedPct=Math.round(((approved+pending)/total)*100);
   const filteredSites=mySites.filter(s=>{
@@ -109,7 +114,9 @@ async function showHomeScreen(){
       </div>
     </div>
     ${attendanceCard}
+    ${summaryCard}
     ${cleaningCard}
+    ${jobsCard}
     <div class="home-progress">
       <div class="home-progress-top">
         <div style="flex:1">
@@ -134,13 +141,13 @@ async function showHomeScreen(){
       ${show5Day?await build5DayPanel(mySites):''}
     </div>
     ${needsAttentionHtml}
-    <div style="font-size:10px;font-weight:600;color:var(--gray);text-transform:uppercase;letter-spacing:.06em;padding:12px 14px 4px">Your Sites</div>
+    <div style="font-size:10px;font-weight:600;color:var(--gray);text-transform:uppercase;letter-spacing:.06em;padding:12px 14px 4px">${isEngineer()?'Your Sites':'Sites'}</div>
     <div style="padding:0 14px 80px">
     ${filteredSites.map(s=>{
       const sub=todaySubmissions[s.site_name];
       const isRejected=sub&&(sub.status==='rejected'||(sub.status==='pending'&&!!(sub.review_note&&String(sub.review_note).trim())));
       let iconCls='site-icon-todo',iconHtml='<span class="material-symbols-outlined" style="font-size:20px;color:var(--gray)">solar_power</span>';
-      let badgeHtml=`<span class="badge badge-gray">Fill now →</span>`;
+      let badgeHtml=isEngineer()?`<span class="badge badge-gray">Fill now →</span>`:`<span class="badge badge-gray">Not filed</span>`;
       if(sub&&sub.status==='approved'){
         iconCls='site-icon-ok';
         iconHtml='<span class="material-symbols-outlined" style="font-size:20px;color:#16a34a;font-variation-settings:\'FILL\' 1">check_circle</span>';

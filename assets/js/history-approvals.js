@@ -1,4 +1,17 @@
 let historyFilters={site:'',date:''};
+// Specific yield (kWh per kWp) instead of PR: most sites have no pyranometer,
+// so PR reads 0% on nearly every card and says nothing. PR is kept only when
+// it is a real number (0 < PR <= 100).
+function yieldBadge(d,cls){
+  cls=cls||'badge badge-gray';
+  const site=sites.find(s=>s.site_name===d.site_name);
+  const dc=Number(d.dc_capacity_kw)||(site&&Number(site.dc_capacity_kw))||0;
+  const gen=Number(d.total_gen_kwh)||0;
+  const sy=dc>0&&gen>0?(gen/dc).toFixed(2)+' kWh/kWp':'';
+  const pr=Number(d.pr_pct);
+  const prOk=pr>0&&pr<=100;
+  return (sy?`<span class="${cls}">${sy}</span>`:'')+(prOk?`<span class="${cls}">PR ${pr}%</span>`:'');
+}
 function showHistory(){
   const el=document.getElementById('screenHistory');
   el.classList.remove('hidden');
@@ -52,7 +65,7 @@ async function loadHistory(){
         </div>
         <div class="history-stats">
           <span class="badge badge-gray">${d.total_gen_kwh||0} kWh</span>
-          <span class="badge badge-gray">PR ${d.pr_pct||0}%</span>
+          ${yieldBadge(d)}
           ${d.grid_outage?'<span class="badge badge-yellow">Grid outage</span>':''}
         </div>
         ${isReturned?`<div style="background:var(--red-light);border:1px solid var(--red-border);border-left:3px solid var(--red);border-radius:0 8px 8px 0;padding:8px 11px;margin-top:8px;font-size:11px;color:var(--red);font-weight:600">Rejected by ${escHtml(d.reviewed_by||'admin')}: ${escHtml(getDisplayNote(d.review_note)||String(d.review_note||''))}</div>`:''}
@@ -103,7 +116,7 @@ async function renderApprovals(el,inAdmin){
             </div>
             <div class="approval-stats">
               <span class="approval-stat">${d.total_gen_kwh||0} kWh</span>
-              <span class="approval-stat">PR ${d.pr_pct||0}%</span>
+              ${yieldBadge(d,'approval-stat')}
               ${flags.join('')}
             </div>
             ${isReturned?`<div style="background:var(--red-light);border:1px solid var(--red-border);border-left:3px solid var(--red);border-radius:0 8px 8px 0;padding:8px 11px;margin:6px 0;font-size:11px;color:var(--red);font-weight:600">Rejected by ${escHtml(d.reviewed_by||'admin')}: ${escHtml(getDisplayNote(d.review_note)||String(d.review_note||''))}</div>`:''}

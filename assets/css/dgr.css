@@ -280,7 +280,36 @@ label{display:block;font-size:10px;color:var(--text-muted);font-weight:600;margi
 .modal-content{background:#fff;border-radius:var(--radius-lg) var(--radius-lg) 0 0;padding:22px;
   width:100%;max-width:420px;max-height:88vh;overflow-y:auto;
   box-shadow:0 -4px 32px rgba(0,0,0,.14)}
+.modal-content{overscroll-behavior:contain}
+body.modal-open{overflow:hidden}
 .modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+
+/* ── Tickets ── */
+.ticket-chip{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;padding:2px 8px;
+  border-radius:20px;background:var(--gray-light);color:var(--on-surf-var)}
+.ticket-chip.overdue{background:var(--red-light);color:var(--red)}
+.ticket-chip.snoozed{background:var(--blue-light);color:var(--blue)}
+.assign-opt{display:flex;align-items:center;justify-content:space-between;padding:9px 11px;border:1px solid var(--border);
+  border-radius:var(--radius-sm);margin-bottom:6px;cursor:pointer;background:var(--card-bg);font-size:12px}
+.assign-opt:active{background:var(--surf-low)}
+.assign-opt .assign-kind{font-size:10px;color:var(--text-muted)}
+.quick-site{padding:7px 12px;border-radius:20px;border:1px solid var(--border);font-size:12px;font-weight:600;
+  cursor:pointer;background:var(--card-bg);color:var(--on-surf-var)}
+.quick-site.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+
+/* ── Home: manager summary and engineer jobs ── */
+.home-summary{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;padding:10px 14px 0}
+.home-sum{background:var(--card-bg);border:1px solid var(--border);border-radius:var(--radius-md);padding:10px 12px;cursor:pointer}
+.home-sum-k{font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--text-muted)}
+.home-sum-v{font-size:22px;font-weight:750;line-height:1.1;margin-top:2px;color:var(--on-surf)}
+.home-sum-v small{font-size:11px;font-weight:500;color:var(--gray)}
+.home-sum.warn .home-sum-v{color:var(--red)}
+.home-sum.amber .home-sum-v{color:var(--amber)}
+.home-job{display:flex;align-items:center;gap:10px;background:var(--card-bg);border:1px solid var(--border);
+  border-radius:var(--radius-md);padding:10px 12px;margin-bottom:8px;cursor:pointer}
+.home-job.alert{border-left:3px solid var(--red)}
+.home-job-t{font-size:12.5px;font-weight:600;color:var(--on-surf)}
+.home-job-m{font-size:10.5px;color:var(--gray);margin-top:2px}
 .modal-title{font-size:15px;font-weight:700;margin:0;font-family:'Space Grotesk',sans-serif}
 .modal-close{width:32px;height:32px;border-radius:50%;border:none;background:#f1f5f9;
   color:#64748b;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;

@@ -91,6 +91,15 @@ Freshness comes from both a Realtime `postgres_changes` subscription on `dgr_sub
 - **`sync-to-sheets`** — pulls `status='approved' AND synced_to_sheet=false`, flattens each row to a fixed ~155-column layout (18 scalars + six 20-wide inverter blocks + outage/transformer/weather tail), POSTs to a Google Apps Script web app URL stored in `dgr_settings.sheets_script_url`, then marks rows synced. Triggered manually from Admin → Settings, optionally by pg_cron every 30 min. Column order is load-bearing for the destination sheet.
 - **`fetch-suryalog`** — polls the Suryalog SCADA API for a 5-minute window across all sites, archives raw JSON to Storage, parses into `scada_*` tables. Needs `SURYALOG_SECRET` and `SURYALOG_SITES` (JSON array of `{site_name, plant_key}`) as function secrets.
 
+## Tickets (`tickets.js`)
+
+One table, `dgr_tickets`, two lifecycles told apart by `source`:
+
+- **Requests** (engineer-raised): `open → (l1_approved) → approved → closure_requested → closed`, or `rejected`/`cancelled`. Amount-based approval against `dgr_settings.ticket_l2_threshold`. Closure request records `actual_cost`, shown against `approved_amount`.
+- **Alerts** (`source='auto'`, raised by database triggers/cron via `auto_raise_ticket()`): `open → acknowledged → resolved`, with `snoozed_until`. No approval. `auto_raise_ticket` dedups against any live ticket for the same rule and site and stays quiet while snoozed.
+
+Any ticket can be assigned (`assigned_to_phone/name/kind`): engineer, manager, or a vendor from `dgr_settings.ticket_vendors` (no login, phone null). `TICKET_LIVE` / `TICKET_DONE` in `tickets.js` are the status sets to use; never list statuses inline. The "Report a problem" quick form sets category Repair and priority medium/high; managers fill the rest with Edit. Home-screen pieces (`buildEngineerJobsCard`, `buildManagerSummary`) live here and are called from `showHomeScreen()`.
+
 ## Insights dashboard (`dashboard/`)
 
 The Insights tab (managers and up) is an iframe of `dashboard/index.html?embed`, the Stockwell DGR Dashboard: its own HTML/JS (`engine.js` pure metrics, `ops.js` loss/issues, `app.js` UI, `theme.js`), outside the `assets/` versioning. Treat `engine.js`/`ops.js`/`app.js`/`theme.js`/`index.html` as vendored — the only DGR-specific file is `dashboard/dgr-config.js`, which:

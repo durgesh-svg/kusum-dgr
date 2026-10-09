@@ -69,6 +69,7 @@ async function loadAppSettings(){
         if(r.key==='plant_fault_codes'&&v)appSettings.plant_fault_codes=v;
         if(r.key==='ticket_l2_threshold'&&v!=null)appSettings.ticket_l2_threshold=Number(v)||0;
         if(r.key==='ticket_categories'&&v)appSettings.ticket_categories=v;
+        if(r.key==='ticket_vendors'&&Array.isArray(v))appSettings.ticket_vendors=v;
         if(r.key==='sheets_script_url')sheetsSettings.script_url=typeof v==='string'?v:(v||'');
         if(r.key==='sheets_sheet_id')sheetsSettings.sheet_id=typeof v==='string'?v:'1agcGb0nTi1u-hEOlHU1eXt30wsWyEeK_';
         if(r.key==='sheets_tab_name')sheetsSettings.tab_name=typeof v==='string'?v:'Raw Data';
@@ -150,6 +151,18 @@ function switchTab(tab){
   // after the dispatch: showOverview() hides every screen before its first await
   if(inReview)showReviewSeg();
 }
+
+// ── MODAL SCROLL LOCK ────────────────────────────────────────────────────────
+// Every modal opens by removing .hidden from #modalOverlay, from many places.
+// Watch that one class instead of patching each opener: while a modal is up,
+// the page behind it must not scroll, or a long ticket can't be read to the end.
+(function(){
+  const ov=document.getElementById('modalOverlay');
+  if(!ov)return;
+  const sync=()=>document.body.classList.toggle('modal-open',!ov.classList.contains('hidden'));
+  new MutationObserver(sync).observe(ov,{attributes:true,attributeFilter:['class']});
+  sync();
+})();
 
 // ── TOAST NOTIFICATION ───────────────────────────────────────────────────────
 function showToast(msg,type='info'){
