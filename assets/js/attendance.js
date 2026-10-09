@@ -27,6 +27,22 @@ function attClient(){
   return _attClient;
 }
 function attendancePhone(){return (session&&(session.attendance_phone||session.phone))||'';}
+// The session is cached at login, so an attendance_phone set by an admin
+// afterwards would never reach it. Read it fresh before every lookup.
+let _attPhoneFresh=false;
+async function freshAttendancePhone(){
+  if(!_attPhoneFresh&&session&&session.userId){
+    try{
+      const{data}=await sb.from('users').select('attendance_phone').eq('id',session.userId).single();
+      if(data){
+        session.attendance_phone=data.attendance_phone||null;
+        localStorage.setItem('dgr_session',JSON.stringify(session));
+        _attPhoneFresh=true;
+      }
+    }catch(e){}
+  }
+  return attendancePhone();
+}
 function attSiteCode(siteName){const s=sites.find(x=>x.site_name===siteName);return s?(s.attendance_site_code||null):null;}
 function attWithinWindow(dateStr){
   const d=new Date(dateStr+'T00:00:00'), lim=new Date();lim.setDate(lim.getDate()-ATT_WINDOW_DAYS);
@@ -57,7 +73,7 @@ function matchCheckin(checkins,siteName){
 async function stampCheckin(siteName,dateStr){
   if(!attWithinWindow(dateStr))return{};              // portal won't answer; leave unstamped
   try{
-    const m=matchCheckin(await fetchCheckins(attendancePhone(),dateStr),siteName);
+    const m=matchCheckin(await fetchCheckins(await freshAttendancePhone(),dateStr),siteName);
     return{
       checkin_status:m.status,
       checkin_at:m.checkin?m.checkin.checked_at:null,
@@ -85,7 +101,7 @@ async function buildAttendanceCard(){
   if(!isEngineer())return '';
   const today=new Date().toISOString().split('T')[0];
   let checkins=null;
-  try{checkins=await fetchCheckins(attendancePhone(),today);}catch(e){}
+  try{checkins=await fetchCheckins(await freshAttendancePhone(),today);}catch(e){}
   let bg='#fff',border='var(--border)',title='📍 Site check-in',color='var(--gray)',body;
   if(checkins===null){
     body='Attendance portal not reachable';
