@@ -50,6 +50,8 @@ Roles are `engineer` | `manager` | `admin` | `director`, ranked in that order by
 
 Business rule enforced in `goNext()`: a report dated **today cannot be advanced past screen 1 before 18:00** local time.
 
+Entry validation lives in `validateReport()` (`dgr-flow.js`): hard errors (impossible values — above 8 kWh/kWp per day for a site or an inverter, PR > 100%, POA > 10, transformer > 120°C, outage windows that end before they start or lack a time/reason) block `goNext()` on screens 2–5, list on screen 9 with a "Fix →" link, and are re-checked in `submitReport()`. Warnings (strings above the site's design count) need a tick on screen 9 via `acknowledgements`. Strings-over-design is deliberately not an error: `site_config.strings_per_inv` is wrong for several sites (Sindhu-1 files above it 83% of the time).
+
 ### Routing
 
 Hash-based, handled by `navTo()`/`handleHashNav()` in `app-shell.js`: `#dgr`, `#history`, `#approvals`, `#insights`, `#overview`, `#admin/<subtab>` (subtabs: dgr, users, sites, approvals, settings, weather, import). Role checks are re-applied on every hash nav.

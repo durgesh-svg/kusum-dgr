@@ -319,7 +319,7 @@ function startDGR(siteName){
     image_urls:[]
   };
   photoFiles={};
-  acknowledgements={inv_zero:false,pr_low:false,temp_high:false};
+  acknowledgements={inv_zero:false,pr_low:false,temp_high:false,strings_over:false};
   fetchWeatherAuto(site);
   goToScreen(1);
 }
@@ -360,7 +360,7 @@ async function editSubmission(id){
     }
 
     photoFiles={};
-    acknowledgements={inv_zero:false,pr_low:false,temp_high:false};
+    acknowledgements={inv_zero:false,pr_low:false,temp_high:false,strings_over:false};
 
     // Flag rejection edit mode — shown as locked banner in Screen 1
     const wasRejected = data.status==='rejected' || (data.status==='pending' && !!(data.review_note && String(data.review_note).trim()));
@@ -459,7 +459,76 @@ function goToScreen(n){
   window.scrollTo(0,0);
 }
 function goBack(){if(currentScreen>1)goToScreen(currentScreen-1);else switchTab('dgr');}
+// ── ENTRY VALIDATION ─────────────────────────────────────────────────────────
+// Hard errors block the screen (goNext) and the submit; they are values that
+// cannot be true. Warnings need an acknowledgement on screen 9, like the
+// existing zero-inverter / low-PR / hot-transformer checks.
+//
+// Limits come from the data, not guesses: the best site-day on record is
+// 7.06 kWh/kWp (Ghewariya); no transformer has ever logged above 101°C.
+// Strings above the configured design count is a WARNING, not an error --
+// Sindhu-1 files more strings than site_config says 83% of the time, so
+// the config is what's wrong there, and blocking would stop the report.
+const VAL_MAX_SY=8;        // kWh per kWp per day, site and inverter
+const VAL_MAX_POA=10;      // kWh/m² per day
+const VAL_MAX_PEAK=1500;   // W/m²
+const VAL_MAX_TEMP=120;    // °C, transformer winding or oil
+const VAL_KW_PER_STRING=15.4;
+function validateReport(screen){
+  const errors=[],warnings=[];
+  const err=(s,msg)=>{if(!screen||screen===s)errors.push({screen:s,msg});};
+  const warn=(key,msg)=>{if(!screen||screen===9)warnings.push({key,msg});};
+  const n=parseInt(formData.inverter_count,10)||0;
+  const gen=formData.inv_gen||[], sc=formData.inv_strings_count||[], design=formData.strings_per_inv||[];
+  // Screen 2: inverters
+  let over=[];
+  for(let i=0;i<n;i++){
+    const g=parseFloat(gen[i])||0, s=parseFloat(sc[i])||0;
+    if(g<0)err(2,`Inverter ${i+1}: generation cannot be negative`);
+    if(s>0&&g>s*VAL_KW_PER_STRING*VAL_MAX_SY)
+      err(2,`Inverter ${i+1}: ${g.toLocaleString('en-IN')} kWh is more than ${s} strings can make in a day (max about ${Math.round(s*VAL_KW_PER_STRING*VAL_MAX_SY).toLocaleString('en-IN')} kWh). Check the kWh or the string count.`);
+    if(s>0&&design[i]>0&&s>design[i])over.push(`${i+1} (${s} of ${design[i]})`);
+  }
+  const dc=parseFloat(formData.dc_capacity_kw)||0, total=parseFloat(formData.total_gen_kwh)||0;
+  if(dc>0&&total>dc*VAL_MAX_SY)
+    err(2,`Total ${total.toLocaleString('en-IN')} kWh is more than a ${dc.toLocaleString('en-IN')} kW plant can make in a day (max about ${Math.round(dc*VAL_MAX_SY).toLocaleString('en-IN')} kWh).`);
+  if(over.length)warn('strings_over',`Strings above the site's design count on inverter ${over.join(', ')}. Confirm the count is right.`);
+  // Screen 3: performance
+  const pr=parseFloat(formData.pr_pct)||0, poa=parseFloat(formData.poa_kwh_m2)||0, peak=parseFloat(formData.peak_radiation_wm2)||0;
+  if(pr>100)err(3,`PR ${pr}% is above 100%. The POA (${poa} kWh/m²) or the generation is wrong.`);
+  if(poa>VAL_MAX_POA)err(3,`POA ${poa} kWh/m² is not possible in a day (max ${VAL_MAX_POA}). Enter kWh/m², not W/m².`);
+  if(peak>VAL_MAX_PEAK)err(3,`Peak radiation ${peak} W/m² is above ${VAL_MAX_PEAK}. Check the reading.`);
+  // Screen 4: outage windows
+  const win=(list,label,need,needLabel)=>list.forEach((o,i)=>{
+    if(!o.from||!o.to){err(4,`${label} ${i+1}: enter both From and To times`);return;}
+    if(o.to<=o.from)err(4,`${label} ${i+1}: ends (${o.to}) before it starts (${o.from})`);
+    if(!o[need])err(4,`${label} ${i+1}: select the ${needLabel}`);
+  });
+  if(formData.grid_outage)win(formData.grid_outage_details||[],'Grid outage','reason','reason');
+  if(formData.plant_outage)win(formData.plant_outage_details||[],'Plant fault','fault_code','fault code');
+  // Screen 5: transformer
+  const wti=parseFloat(formData.wti_c)||0, oti=parseFloat(formData.oti_c)||0;
+  if(wti>VAL_MAX_TEMP)err(5,`WTI ${wti}°C is above ${VAL_MAX_TEMP}°C; no transformer runs that hot. Check the reading.`);
+  if(oti>VAL_MAX_TEMP)err(5,`OTI ${oti}°C is above ${VAL_MAX_TEMP}°C; no transformer runs that hot. Check the reading.`);
+  return{errors,warnings};
+}
+// Shows the current screen's errors at its top; true when the screen may advance
+function showScreenErrors(screen){
+  const el=document.getElementById('screen'+screen);
+  if(!el)return true;
+  const old=document.getElementById('sValErr');if(old)old.remove();
+  const{errors}=validateReport(screen);
+  if(!errors.length)return true;
+  const box=document.createElement('div');
+  box.id='sValErr';box.className='error-box';box.style.marginBottom='10px';
+  box.innerHTML=`<div style="font-weight:700;margin-bottom:4px">Fix before continuing</div>`+errors.map(e=>`<div style="margin-top:3px">• ${escHtml(e.msg)}</div>`).join('');
+  el.insertBefore(box,el.firstChild);
+  box.scrollIntoView({behavior:'smooth',block:'start'});
+  return false;
+}
+
 function goNext(){
+  if(currentScreen>=2&&currentScreen<=5&&!showScreenErrors(currentScreen))return;
   if(currentScreen===1){
     // Time restriction: block today before 6 PM (Feature 1)
     const todayStr=new Date().toISOString().split('T')[0];
@@ -1276,13 +1345,32 @@ function buildScreen9(){
         ${acknowledgements.temp_high?'Flagged':'Flag'}</div>
     </div>`;
   }
-  if(!zeroInvs&&!prLow&&!tempHigh){
+  // Entry validation: impossible values block, doubtful ones need a tick
+  const{errors:valErrors,warnings:valWarnings}=validateReport();
+  valErrors.forEach(e=>{
+    valRows+=`<div class="val-row">
+      <div class="v-icon v-icon-err">✕</div>
+      <div class="val-text">${escHtml(e.msg)}</div>
+      <div class="ack-badge pending" onclick="goToScreen(${e.screen})">Fix →</div>
+    </div>`;
+  });
+  valWarnings.forEach(w=>{
+    valRows+=`<div class="val-row">
+      <div class="v-icon v-icon-warn">!</div>
+      <div class="val-text">${escHtml(w.msg)}</div>
+      <div class="ack-badge ${acknowledgements[w.key]?'done':'pending'}" onclick="acknowledgements['${w.key}']=true;buildScreen9()">
+        ${acknowledgements[w.key]?'Confirmed':'Confirm'}</div>
+    </div>`;
+  });
+  if(!zeroInvs&&!prLow&&!tempHigh&&!valErrors.length&&!valWarnings.length){
     valRows+=`<div class="val-row"><div class="v-icon v-icon-ok">✓</div><div class="val-text">All checks passed</div></div>`;
   }
   let canSubmit=true;
   if(zeroInvs>0&&!acknowledgements.inv_zero)canSubmit=false;
   if(prLow&&!acknowledgements.pr_low)canSubmit=false;
   if(tempHigh&&!acknowledgements.temp_high)canSubmit=false;
+  if(valErrors.length)canSubmit=false;
+  if(valWarnings.some(w=>!acknowledgements[w.key]))canSubmit=false;
   const photoCount=Object.values(photoFiles).filter(Boolean).length;
   const dateStr=formData.report_date?new Date(formData.report_date+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}):'';
   const gridMins=(formData.grid_outage_details||[]).reduce((a,o)=>a+calcMins(o.from,o.to),0);
@@ -1309,6 +1397,15 @@ function buildScreen9(){
 
 // SUBMIT
 async function submitReport(){
+  // Last gate: screen 9 disables the button, but a stale screen or a direct
+  // call must not get past impossible values either.
+  const{errors:valErrors}=validateReport();
+  if(valErrors.length){
+    showToast(valErrors[0].msg,'error');
+    goToScreen(valErrors[0].screen);
+    showScreenErrors(valErrors[0].screen);
+    return;
+  }
   const btn=document.getElementById('btnNext');
   btn.disabled=true;btn.textContent='Submitting...';
   try{

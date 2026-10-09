@@ -50,7 +50,7 @@ function handleHashNav(){
 window.addEventListener('popstate',()=>{if(session&&session.loggedIn)handleHashNav();});
 let formData={};
 let photoFiles={};  // keyed by slot name
-let acknowledgements={inv_zero:false,pr_low:false,temp_high:false};
+let acknowledgements={inv_zero:false,pr_low:false,temp_high:false,strings_over:false};
 let todaySubmissions={};
 let appSettings={grid_outage_reasons:[...DEFAULT_GRID_REASONS],plant_fault_codes:[...DEFAULT_FAULT_CODES],
   ticket_l2_threshold:5000};
