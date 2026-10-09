@@ -100,7 +100,7 @@ The Insights tab (managers and up) is an iframe of `dashboard/index.html?embed`,
 - holds back trailing days until 80% of the usual site count has filed, because the dashboard reads its latest date as a complete day,
 - then loads the dashboard scripts in order.
 
-`insights_rename` swaps Gajroopdesar -1/-2 for display only (the budget sheet names them opposite to the DGR app, where "-1" is the 4 MW plant); set its `map` to `{}` to show DGR names. A new site needs `peer_sites` in `site_config` to get a "vs nearby plants" benchmark. When any dashboard file changes, bump `VER` in `dgr-config.js`, the `?v=` on its script tag in `dashboard/index.html`, and the `&v=` on the iframe src in `admin-insights.js`.
+`insights_rename` is `{"map": {}}`: Insights shows DGR-app site names (Gajroopdesar -1 is the 4 MW plant; the budget sheet names the pair the other way round, and the map can swap them for display if that ever changes). A new site needs `peer_sites` in `site_config` to get a "vs nearby plants" benchmark. When any dashboard file changes, bump `VER` in `dgr-config.js`, the `?v=` on its script tag in `dashboard/index.html`, and the `&v=` on the iframe src in `admin-insights.js`.
 
 ## Standalone pages
 

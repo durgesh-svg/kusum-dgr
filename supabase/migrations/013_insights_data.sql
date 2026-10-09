@@ -5,9 +5,10 @@
 -- data/master.json (site master, meter readings, seasonal factors). Both now
 -- live here, so dashboard/dgr-config.js reads only from Supabase.
 --
--- All site names are in DGR-app form. The dashboard swaps Gajroopdesar -1/-2
--- for display (dgr_settings.insights_rename) because the budget sheet names
--- them the other way round: in this database "-1" is the 4 MW plant.
+-- All site names are in DGR-app form: Gajroopdesar -1 is the 4 MW plant.
+-- The budget sheet names the two Gajroopdesar plants the other way round;
+-- dgr_settings.insights_rename can swap them for display but is set to {}
+-- (decided 9 Oct 2026: Insights shows the same names as the rest of the app).
 --
 -- Read-only for the app: SELECT policies only. Rows are loaded by an admin.
 -- Seeded 9 Oct 2026 from the dashboard package (Stockwell DGR Dashboard (2).zip).
@@ -58,4 +59,4 @@ CREATE POLICY "Read site_meter_monthly" ON site_meter_monthly FOR SELECT USING (
 -- Seasonal factors and the display rename go in dgr_settings (JSONB key/value):
 --   insights_seasonal = {"factors": {"01": 0.861, ...}, "note": "..."}
 --   insights_rename   = {"map": {"Gajroopdesar -1": "Gajroopdesar -2", ...}, "note": "..."}
--- Set insights_rename to {"map": {}} to show DGR-app names unchanged.
+-- insights_rename is {"map": {}}: DGR-app names unchanged.
