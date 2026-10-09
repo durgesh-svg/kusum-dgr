@@ -144,6 +144,17 @@ label{display:block;font-size:10px;color:var(--text-muted);font-weight:600;margi
   display:flex;flex-direction:column;gap:9px}
 .screen-padded{padding-bottom:70px}
 
+/* ── Review tab segment bar (managers+) ── */
+.review-seg{position:sticky;top:0;z-index:20;display:flex;gap:4px;margin:0;padding:10px 14px 4px;
+  background:var(--bg)}
+.review-seg-btn{flex:1;text-align:center;padding:8px 6px;border-radius:var(--radius-sm);font-size:12px;
+  font-weight:600;color:var(--on-surf-var);background:var(--card-bg);border:1px solid var(--border);
+  cursor:pointer;transition:var(--transition);display:flex;align-items:center;justify-content:center;gap:5px}
+.review-seg-btn.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+.review-seg-count{font-size:10px;font-weight:700;min-width:16px;padding:0 5px;border-radius:99px;
+  background:var(--red);color:#fff;line-height:16px}
+.review-seg-count:empty{display:none}
+
 /* ── Level bar ── */
 .level-bar{height:6px;background:var(--border);border-radius:99px;overflow:hidden;margin-top:4px}
 .level-fill{height:100%;border-radius:99px;transition:width .35s ease}

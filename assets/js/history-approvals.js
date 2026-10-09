@@ -9,7 +9,7 @@ function showHistory(){
     :sites.map(s=>s.site_name);
   siteList.forEach(s=>{siteOptions+=`<option value="${s}"${historyFilters.site===s?' selected':''}>${s}</option>`;});
   el.innerHTML=`
-    <div class="card-title">Submission History</div>
+    ${isEngineer()?'<div class="card-title">Submission History</div>':''}
     <div class="card" style="padding:10px;margin-bottom:8px">
       <div style="display:flex;gap:6px;margin-bottom:8px">
         <div style="flex:1">
@@ -71,6 +71,7 @@ async function showApprovals(){
   const el=document.getElementById('screenApprovals');
   el.classList.remove('hidden');
   await renderApprovals(el,false);
+  refreshReviewCount();   // keep the Review tab's pending badge in step after approve/reject
 }
 async function renderApprovals(el,inAdmin){
   el.innerHTML='<div style="text-align:center;color:var(--gray);padding:20px">Loading...</div>';
@@ -80,7 +81,7 @@ async function renderApprovals(el,inAdmin){
     const{data}=await query;
     const filters=['all','pending','approved','rejected'];
     const refresh=inAdmin?'showApprovalInAdmin':'showApprovals';
-    el.innerHTML=`${!inAdmin?'<div class="card-title">Approvals</div>':''}
+    el.innerHTML=`
       <div class="filter-pills">
         ${filters.map(f=>`<div class="filter-pill${f===approvalFilter?' active':''}" onclick="approvalFilter='${f}';${refresh}()">${f.charAt(0).toUpperCase()+f.slice(1)}</div>`).join('')}
       </div>

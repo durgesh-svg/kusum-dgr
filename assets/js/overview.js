@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────
 // OVERVIEW DASHBOARD — Full Implementation
 // Compliance + Performance + Charts + Inverter Health
-// Admin only
+// Managers and up, under the Review tab
 // ─────────────────────────────────────────────────────────────
 
 const CUTOFF_HOUR = 21; // 9 PM cutoff
