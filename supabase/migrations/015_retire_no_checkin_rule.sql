@@ -1,0 +1,20 @@
+-- 015: retire the no_checkin_3d alert rule
+--
+-- Applied 2 Nov 2026 via Supabase MCP apply_migration.
+--
+-- The rule raised a medium alert whenever a site filed three reports in a row
+-- with no expense-portal check-in. It produced 64 tickets in three weeks, far
+-- more than any other rule, and the answer was always the same person issue
+-- rather than a plant issue. Retired at the director's request.
+--
+-- Check-in status is still stamped on every report (checkin_status) and still
+-- shows as a badge on approval cards; it just no longer raises a ticket.
+--
+-- What this did:
+--   1. CREATE OR REPLACE eval_site_alerts() with the no_checkin_3d block removed
+--      (the function body otherwise matches 012; it lives in the database).
+--      run_auto_tickets() never had this rule, so it is unchanged.
+--   2. Cancelled the 31 open/acknowledged no_checkin_3d tickets with a system
+--      comment explaining why. Resolved and cancelled ones were left as they were.
+--
+-- To bring it back, restore the block from 012_alerts_on_submit.sql.

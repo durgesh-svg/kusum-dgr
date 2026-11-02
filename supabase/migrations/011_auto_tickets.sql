@@ -9,7 +9,7 @@
 --   inverter_zero    an inverter at 0 kWh while the site produced                      high
 --   transformer_hot  WTI or OTI above 85 C                                              critical
 --   site_silent_2d   no DGR filed for 2 consecutive days                                high
---   no_checkin_3d    3 consecutive reports with no site check-in                        medium
+--   no_checkin_3d    3 consecutive reports with no site check-in           (retired 2 Nov 2026, see 015)
 --   chronic_grid     > 15 h recorded grid outage in the trailing 7 days (Mondays only)  medium
 --   cleaning_poor    engineer logged cleaning quality 'poor'                            medium
 
